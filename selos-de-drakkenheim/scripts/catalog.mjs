@@ -10,7 +10,8 @@ export async function loadCatalog() {
 }
 export function recipes() {
   const changes=game.settings.get(ID,"recipeResults");
-  return [...catalog.recipes,...game.settings.get(ID,"customRecipes")].map(r=>({...r,...changes[r.id]}));
+  const images=game.settings.get(ID,"recipeImages")??{};
+  return [...catalog.recipes,...game.settings.get(ID,"customRecipes")].map(r=>({...r,...changes[r.id],img:safeImage(images[r.id]??r.img,"")}));
 }
 export const getRecipe = id => recipes().find(r=>r.id===id);
 export const components = actor => actor.items.filter(i=>i.getFlag(ID,"kind")==="component" && i.system.quantity>0);

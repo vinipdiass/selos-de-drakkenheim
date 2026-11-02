@@ -1,6 +1,6 @@
 import {ID,RARITIES,CATEGORIES,TYPES,escapeHTML as e,safeImage,normalize,recipeSlots,studyCandidates,workshopMeets,harvestTools,HARVEST_TOOLS_NAME,HARVEST_TOOLS_REQUIRED} from "./core.mjs";
 import {catalog,recipes,getRecipe,components,knownRecipes,accessibleActors,owns,componentPreview} from "./catalog.mjs";
-import {studyComponents,submitRequest,requests,serialize,revokeRecipe} from "./service.mjs";
+import {studyComponents,submitRequest,requests,serialize,revokeRecipe,setRecipeImage} from "./service.mjs";
 import {harvestDestination,harvestProfile,isDefeatedEnemy,partKey,requestTokenHarvest} from "./harvest.mjs";
 import {CraftingPlan,resolveInventoryDrop} from "./crafting.mjs";
 
@@ -12,6 +12,11 @@ const rarityBadge=rarity=>`<span class="sd-rarity" style="--rarity:${colors[rari
 const picture=(src,alt,fallback="icons/svg/item-bag.svg",cls="")=>`<img class="${cls}" src="${e(safeImage(src,fallback))}" alt="${e(alt)}" data-fallback="${e(fallback)}" loading="lazy" draggable="false">`;
 const categoryGlyph={animus:"fa-fire-flame-curved",bones:"fa-bone",dust:"fa-wand-sparkles",fluid:"fa-droplet",hair:"fa-feather",hide:"fa-shield-halved",natural:"fa-paw",organs:"fa-heart"};
 const recipeGlyph=recipe=>({Arma:"fa-sword",Armadura:"fa-shield-halved",Poção:"fa-flask",Pergaminho:"fa-scroll",Anel:"fa-ring",Varinha:"fa-wand-sparkles"}[recipe.category]??"fa-gem");
+const recipeArt=recipe=>recipe?.img?picture(recipe.img,recipe.name,"icons/svg/book.svg"):icon(recipeGlyph(recipe??{}));
+function recipeCrest(recipe){
+  const art=recipeArt(recipe);
+  return game.user.isGM?`<button type="button" class="sd-recipe-crest sd-edit-recipe-icon" data-game-action="edit-recipe-icon" data-recipe-id="${e(recipe.id)}" title="${e(`Alterar o ícone de ${recipe.name} para todos os personagens`)}" aria-label="${e(`Alterar ícone global de ${recipe.name}`)}">${art}<span class="sd-icon-edit-mark">${icon("fa-pen")}</span></button>`:`<div class="sd-recipe-crest">${art}</div>`;
+}
 const itemImage=item=>safeImage(item.img,componentPreview(item.flags?.[ID]??{}).src);
 function slotName(slot){
   return slot.alternatives.map(alternative=>{
@@ -25,11 +30,32 @@ function materialTile(item,{actionName="material",remaining=item.system.quantity
   const component=item.flags[ID],preview=componentPreview(component);
   return `<button type="button" class="sd-material ${selected?"is-selected":""}" style="--rarity:${colors[component.rarity]??colors.common}" data-game-action="${actionName}" data-item-id="${e(item.id)}" ${draggable&&remaining>0?`draggable="true" data-drag-item="${e(item.id)}"`:""} ${disabled?"disabled":""} ${actionName==="toggle-study"?`aria-pressed="${selected}"`:""} title="${e(`${item.name}\n${CATEGORIES[component.category]} · ${RARITIES[component.rarity]}${subtitle?`\n${subtitle}`:""}`)}"><span class="sd-item-art">${picture(itemImage(item),"",preview.fallback)}<span class="sd-quantity">${remaining>0?`×${remaining}`:"Reservado"}</span>${selected?`<span class="sd-check">${icon("fa-check")}</span>`:""}</span><strong>${e(item.name.split(" | ")[0])}</strong><small>${e(subtitle||CATEGORIES[component.category])}</small></button>`;
 }
-function heroHeader({eyebrow,title,subtitle,portrait,glyph="fa-book-skull",rarity,side=""}){
-  return `<header class="sd-hero"><div class="sd-hero-art">${portrait?picture(portrait,"Retrato","icons/svg/mystery-man.svg"):icon(glyph)}</div><div class="sd-hero-copy"><span class="sd-eyebrow">${e(eyebrow)}</span><h1>${e(title)}</h1><p>${e(subtitle??"")}</p>${rarity?rarityBadge(rarity):""}</div>${side?`<div class="sd-hero-side">${side}</div>`:""}</header>`;
+function heroHeader({eyebrow,title,subtitle,portrait,portraitFallback="icons/svg/mystery-man.svg",glyph="fa-book-skull",rarity,side=""}){
+  return `<header class="sd-hero"><div class="sd-hero-art">${portrait?picture(portrait,"Retrato",portraitFallback):icon(glyph)}</div><div class="sd-hero-copy"><span class="sd-eyebrow">${e(eyebrow)}</span><h1>${e(title)}</h1><p>${e(subtitle??"")}</p>${rarity?rarityBadge(rarity):""}</div>${side?`<div class="sd-hero-side">${side}</div>`:""}</header>`;
 }
 function emptyState(glyph,title,text){return `<div class="sd-empty"><span>${icon(glyph)}</span><h2>${e(title)}</h2><p>${e(text)}</p></div>`;}
 const errorText=error=>error.message??String(error);
+
+export async function editRecipeIcon(recipeId){
+  if(!game.user.isGM)throw new Error("Somente o mestre pode alterar o ícone global de uma receita.");
+  const recipe=getRecipe(recipeId);if(!recipe)throw new Error("Receita não encontrada.");
+  const {DialogV2}=foundry.applications.api;
+  const result=await DialogV2.wait({window:{title:`Ícone global — ${recipe.name}`},classes:["selos-icon-dialog"],position:{width:540},modal:false,content:`<div class="selos-recipe-icon-editor"><p>O ícone de <strong>${e(recipe.name)}</strong> será alterado para <strong>todos os personagens deste mundo</strong>.</p><div class="selos-icon-preview"><img data-icon-preview src="${e(recipe.img||"icons/svg/book.svg")}" alt="Prévia do ícone" ${recipe.img?"":"hidden"}><i data-icon-default class="fa-solid ${recipeGlyph(recipe)}" ${recipe.img?"hidden":""} aria-hidden="true"></i></div><label class="selos-field"><span>Imagem (caminho ou URL)</span><input type="text" name="recipeIconPath" value="${e(recipe.img)}" maxlength="2048" placeholder="icons/… ou https://…"></label><button type="button" data-browse-recipe-icon><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Escolher arquivo</button><p class="selos-note">Escolha uma imagem acessível aos jogadores. Em branco: usar o ícone padrão da categoria.</p></div>`,buttons:[{action:"save",label:"Salvar para todos",callback:(_event,_button,dialog)=>({path:dialog.element.querySelector('[name="recipeIconPath"]').value})},{action:"reset",label:"Usar ícone padrão",callback:()=>({path:""})},{action:"cancel",label:"Cancelar",callback:()=>null}],rejectClose:false,render:(_event,dialog)=>{
+    const root=dialog.element,input=root.querySelector('[name="recipeIconPath"]'),preview=root.querySelector('[data-icon-preview]'),fallback=root.querySelector('[data-icon-default]');
+    const updatePreview=()=>{const path=safeImage(input.value,"");preview.hidden=!path;fallback.hidden=!!path;if(path)preview.src=path;};
+    preview.addEventListener("error",()=>{preview.hidden=true;fallback.hidden=false;});input.addEventListener("input",updatePreview);
+    root.querySelector('[data-browse-recipe-icon]').addEventListener("click",()=>{
+      try{
+        const FilePicker=foundry.applications.apps.FilePicker.implementation;
+        Promise.resolve(new FilePicker({type:"image",current:input.value,callback:path=>{if(!root.isConnected)return;input.value=path;updatePreview();}}).render({force:true})).catch(error=>ui.notifications.error(errorText(error)));
+      }catch(error){ui.notifications.error(errorText(error));}
+    });
+  }});
+  if(!result)return;
+  await setRecipeImage(recipeId,result.path);
+  await refreshPlayerPanels();
+  ui.notifications.info(`Ícone de ${recipe.name} atualizado para todos os personagens.`);
+}
 
 export class GamePanel extends ApplicationV2{
   static DEFAULT_OPTIONS={classes:["selos-game"],window:{title:"Selos de Drakkenheim",icon:"fa-solid fa-book-skull",resizable:true},position:{width:960,height:760}};
@@ -82,7 +108,7 @@ class PlayerBook extends GamePanel{
     const bank=items.length?`<div class="sd-material-grid">${items.map(item=>materialTile(item,{actionName:"inspect",draggable:true})).join("")}</div>`:emptyState("fa-paw","Sua bolsa está vazia","Procure componentes em criaturas derrotadas. Clique com o botão direito no token de um inimigo com 0 PV.");
     const list=cards.length?`<div class="sd-recipe-grid">${cards.map(recipe=>{
       const total=recipeSlots(recipe).length,pending=requests().find(request=>request.actorUuid===actor.uuid&&request.recipeId===recipe.id&&["pending","processing","recovery"].includes(request.status));
-      return `<article class="sd-recipe-card" data-search="${e(normalize(`${recipe.name} ${recipe.originalName}`))}" data-rarity="${recipe.rarity}" style="--rarity:${colors[recipe.rarity]??colors.veryRare}"><div class="sd-recipe-crest">${icon(recipeGlyph(recipe))}</div>${rarityBadge(recipe.rarity)}<h2>${e(recipe.name)}</h2><p>${e(recipe.category)} <span>· ${total} componentes</span></p><details><summary>Ver receita</summary><ul>${recipe.requirements.map(requirement=>`<li>${e(requirement.label)}</li>`).join("")}</ul>${recipe.attunement?`<p>${e(recipe.attunement)}</p>`:""}${recipe.other?`<p>${e(recipe.other)}</p>`:""}</details>${action("forge",pending?"Ver pedido":"Abrir bancada",pending?"fa-hourglass-half":"fa-hammer",`data-recipe-id="${recipe.id}"`)}${game.user.isGM?action("remove-recipe","Remover receita","fa-trash-can",`class="sd-forget-recipe" data-recipe-id="${e(recipe.id)}" aria-label="${e(`Remover ${recipe.name} do grimório de ${actor.name}`)}"`):""}</article>`;
+      return `<article class="sd-recipe-card" data-search="${e(normalize(`${recipe.name} ${recipe.originalName}`))}" data-rarity="${recipe.rarity}" style="--rarity:${colors[recipe.rarity]??colors.veryRare}">${recipeCrest(recipe)}${rarityBadge(recipe.rarity)}<h2>${e(recipe.name)}</h2><p>${e(recipe.category)} <span>· ${total} componentes</span></p><details><summary>Ver receita</summary><ul>${recipe.requirements.map(requirement=>`<li>${e(requirement.label)}</li>`).join("")}</ul>${recipe.attunement?`<p>${e(recipe.attunement)}</p>`:""}${recipe.other?`<p>${e(recipe.other)}</p>`:""}</details>${action("forge",pending?"Ver pedido":"Abrir bancada",pending?"fa-hourglass-half":"fa-hammer",`data-recipe-id="${recipe.id}"`)}${game.user.isGM?action("remove-recipe","Remover receita","fa-trash-can",`class="sd-forget-recipe" data-recipe-id="${e(recipe.id)}" aria-label="${e(`Remover ${recipe.name} do grimório de ${actor.name}`)}"`):""}</article>`;
     }).join("")}</div><p class="sd-no-results" hidden>Nenhuma receita corresponde à pesquisa.</p>`:emptyState("fa-book-open","Todo grimório começa em branco","Estude os componentes durante um descanso longo para descobrir receitas. O mestre também pode ensinar uma receita ao personagem.");
     return `${header}${tabs}<div class="sd-book-layout"><main class="sd-main"><div class="sd-section-heading"><div><span class="sd-eyebrow">${this.tab==="recipes"?"Conhecimento conquistado":"Coletas da jornada"}</span><h2>${this.tab==="recipes"?"Suas receitas":"Seus componentes"}</h2></div><span class="sd-count">${this.tab==="recipes"?cards.length:items.length}</span></div>${this.tab==="recipes"?`<div class="sd-search"><input type="search" name="recipeSearch" value="${e(this.query)}" placeholder="Buscar no grimório…" aria-label="Buscar receita"><select name="recipeRarity" aria-label="Raridade da receita"><option value="">Todas as raridades</option>${Object.entries({...RARITIES,varies:"Variável"}).map(([key,label])=>`<option value="${key}" ${key===this.rarity?"selected":""}>${label}</option>`).join("")}</select></div>${list}`:bank}${this.feedbackHTML()}</main><aside class="sd-book-aside"><div class="sd-rest-card">${icon("fa-moon")}<span class="sd-eyebrow">Estudo no descanso</span><strong>${study?`${remaining} análise(s) disponível(is)`:"Descanse para descobrir"}</strong><p>Escolha o material. A descoberta será uma receita inédita, sorteada entre as compatíveis.</p>${action("study","Analisar componentes","fa-magnifying-glass",remaining?"":"disabled")}</div><div class="sd-aside-heading"><h3>Bolsa de componentes</h3><span>${items.length}</span></div><p class="sd-muted">Arraste estes materiais para a bancada de uma receita.</p><div class="sd-bag-grid">${items.map(item=>materialTile(item,{actionName:"inspect",draggable:true})).join("")||'<p class="sd-muted">Nenhum componente coletado.</p>'}</div></aside></div>`;
   }
@@ -94,6 +120,7 @@ class PlayerBook extends GamePanel{
     if(action==="recipes"||action==="materials"){this.tab=action;return this.redraw();}
     if(action==="study")return openPlayerStudy(this.actor);
     if(action==="forge")return openForge(this.actor,getRecipe(target.dataset.recipeId));
+    if(action==="edit-recipe-icon")return editRecipeIcon(target.dataset.recipeId);
     if(action==="remove-recipe"){
       const actor=this.actor,id=target.dataset.recipeId,name=getRecipe(id)?.name??"Receita";
       target.disabled=true;
@@ -143,8 +170,8 @@ class ForgePanel extends GamePanel{
     this.submitted=requests().find(request=>request.actorUuid===actor.uuid&&request.recipeId===recipe.id&&["pending","processing","recovery"].includes(request.status))??null;
   }
   async _renderHTML(){
-    const {plan,recipe}=this;plan.setInventory(components(this.actor));
-    const header=heroHeader({eyebrow:"Bancada de fabricação",title:recipe.name,subtitle:`${this.actor.name} · ${recipe.category}`,glyph:recipeGlyph(recipe),rarity:plan.rarity});
+    const {plan}=this,recipe=getRecipe(this.recipe.id)??this.recipe;plan.setInventory(components(this.actor));
+    const header=heroHeader({eyebrow:"Bancada de fabricação",title:recipe.name,subtitle:`${this.actor.name} · ${recipe.category}`,portrait:recipe.img,portraitFallback:"icons/svg/book.svg",glyph:recipeGlyph(recipe),rarity:plan.rarity});
     if(this.submitted){
       const current=requests().find(request=>request.id===this.submitted.id)??this.submitted,completed=current.status==="completed",rejected=current.status==="rejected";
       return `${header}<main class="sd-main sd-submitted">${emptyState(completed?"fa-gem":rejected?"fa-xmark":"fa-hourglass-half",completed?"Seu item foi forjado":rejected?"Pedido recusado":"Pedido enviado ao mestre",completed?"O item fabricado já está no inventário do personagem.":rejected?"O mestre recusou esta fabricação. Seus componentes foram preservados.":"A bancada está registrada. Seus materiais serão consumidos após a aprovação do mestre.")}${this.feedbackHTML()}<div class="sd-center-actions">${action("sheet","Ver inventário","fa-sack-xmark")}${action("book","Voltar ao grimório","fa-book-open")}${action("close","Fechar")}</div></main>`;
@@ -219,7 +246,7 @@ class DiscoveryPanel extends GamePanel{
   constructor(actor,result){super();this.kind="discovery";this.actor=actor;this.result=result;this.notice=result.chatError??"";}
   async _renderHTML(){
     const learned=this.result.learned;
-    return `${heroHeader({eyebrow:"Conhecimento conquistado",title:learned.length?"Uma nova página no grimório":"O estudo foi concluído",subtitle:learned.length?`${learned.length} receita(s) inédita(s) descoberta(s)`:"Nenhuma receita inédita compatível restante",glyph:"fa-sparkles"})}<main class="sd-main"><div class="sd-discovery-grid">${learned.map((entry,index)=>{const recipe=getRecipe(entry.id);return `<article class="sd-discovery-card" style="--rarity:${colors[recipe?.rarity]??colors.veryRare};--delay:${index*90}ms"><span class="sd-discovery-seal">${icon(recipeGlyph(recipe??{}))}</span>${rarityBadge(recipe?.rarity)}<h2>${e(recipe?.name??"Receita indisponível")}</h2>${recipe?.originalName?`<p class="sd-discovery-original" lang="en">${e(recipe.originalName)}</p>`:""}<p>Descoberta ao estudar</p><strong>${e(entry.componentName)}</strong></article>`;}).join("")}</div>${this.feedbackHTML()}${this.result.unavailable.length?`<p class="sd-rule">Sem nova descoberta para ${this.result.unavailable.map(item=>e(item.name)).join(", ")}. Essas análises não foram gastas.</p>`:""}<p class="sd-saved">${icon("fa-check")} ${learned.length?"As receitas já estão salvas no personagem.":"Seus materiais foram preservados."}</p></main><footer class="sd-footer"><span></span>${action("book","Abrir grimório","fa-book-open")}${action("close","Concluir","fa-check")}</footer>`;
+    return `${heroHeader({eyebrow:"Conhecimento conquistado",title:learned.length?"Uma nova página no grimório":"O estudo foi concluído",subtitle:learned.length?`${learned.length} receita(s) inédita(s) descoberta(s)`:"Nenhuma receita inédita compatível restante",glyph:"fa-sparkles"})}<main class="sd-main"><div class="sd-discovery-grid">${learned.map((entry,index)=>{const recipe=getRecipe(entry.id);return `<article class="sd-discovery-card" style="--rarity:${colors[recipe?.rarity]??colors.veryRare};--delay:${index*90}ms"><span class="sd-discovery-seal">${recipeArt(recipe)}</span>${rarityBadge(recipe?.rarity)}<h2>${e(recipe?.name??"Receita indisponível")}</h2>${recipe?.originalName?`<p class="sd-discovery-original" lang="en">${e(recipe.originalName)}</p>`:""}<p>Descoberta ao estudar</p><strong>${e(entry.componentName)}</strong></article>`;}).join("")}</div>${this.feedbackHTML()}${this.result.unavailable.length?`<p class="sd-rule">Sem nova descoberta para ${this.result.unavailable.map(item=>e(item.name)).join(", ")}. Essas análises não foram gastas.</p>`:""}<p class="sd-saved">${icon("fa-check")} ${learned.length?"As receitas já estão salvas no personagem.":"Seus materiais foram preservados."}</p></main><footer class="sd-footer"><span></span>${action("book","Abrir grimório","fa-book-open")}${action("close","Concluir","fa-check")}</footer>`;
   }
 }
 

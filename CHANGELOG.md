@@ -1,5 +1,13 @@
 # Histórico
 
+## 1.2.0
+
+- Permite ao mestre clicar no ícone de uma receita no grimório de qualquer personagem e alterá-lo para todos os personagens do mundo.
+- Inclui prévia, seleção de imagem pelo navegador de arquivos do Foundry, campo de caminho/URL e restauração do ícone padrão.
+- Atualiza grimórios, bancadas e descobertas; receitas aprendidas no futuro usam o mesmo ícone global.
+- Armazena os ícones nas configurações do mundo, sem alterar o conhecimento de receitas dos personagens.
+- Testes de permissão e atualização entre duas sessões, incluindo persistência ao recarregar.
+
 ## 1.1.5
 
 - Corrige a expansão dos requisitos na bancada: cada texto ocupa seu próprio espaço e empurra as próximas linhas.

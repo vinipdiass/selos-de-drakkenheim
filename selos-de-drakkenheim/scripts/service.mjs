@@ -1,4 +1,4 @@
-import {ID,RARITIES,assert,studyLimit,drawStudyRecipes,validateCombination,workshopMeets,escapeHTML} from "./core.mjs";
+import {ID,RARITIES,assert,studyLimit,drawStudyRecipes,validateCombination,workshopMeets,escapeHTML,safeImage} from "./core.mjs";
 import {getRecipe,recipes,components,knownRecipes,owns,primaryGM} from "./catalog.mjs";
 
 let queue=Promise.resolve();
@@ -28,6 +28,20 @@ export function revokeRecipe(actor,recipeId) {
     await actor.setFlag(ID,"recipes",remaining);
     Hooks.callAll(`${ID}.updated`,actor);
     return true;
+  });
+}
+export function setRecipeImage(recipeId,value) {
+  return serialize(async()=>{
+    assert(game.user.isGM,"Somente o mestre pode alterar o ícone global de uma receita.");
+    assert(getRecipe(recipeId),"Receita não encontrada.");
+    assert(typeof value==="string","Informe o caminho ou URL da imagem.");
+    const path=value.trim();
+    assert(path.length<=2048 && (!path || safeImage(path,"")===path),"Informe um caminho ou URL válido para a imagem.");
+    const images={...(game.settings.get(ID,"recipeImages")??{})};
+    if(path)images[recipeId]=path;else delete images[recipeId];
+    await game.settings.set(ID,"recipeImages",images);
+    Hooks.callAll(`${ID}.updated`);
+    return path;
   });
 }
 async function addRecipes(actor,ids,source) {

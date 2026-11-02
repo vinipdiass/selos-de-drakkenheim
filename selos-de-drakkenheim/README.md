@@ -14,7 +14,7 @@ Depois, abra o mundo D&D 5e e ative **Selos de Drakkenheim** em **Gerenciar mód
 
 ## Instalação manual
 
-1. Extraia `selos-de-drakkenheim-v1.1.5.zip` dentro da pasta `Data/modules` do seu Foundry.
+1. Extraia `selos-de-drakkenheim-v1.2.0.zip` dentro da pasta `Data/modules` do seu Foundry.
 2. Confirme que o arquivo está em `Data/modules/selos-de-drakkenheim/module.json`, sem uma pasta duplicada no caminho.
 3. Reinicie o Foundry, abra seu mundo D&D 5e e ative **Selos de Drakkenheim** em **Gerenciar módulos**.
 
@@ -72,6 +72,8 @@ O padrão usa a **pontuação de Inteligência**, seguindo o pedido. Em **Config
 
 Se o mestre inicia o descanso e há um proprietário jogador conectado, o convite de análise é enviado a esse jogador. Sem jogador conectado, o mestre pode realizar a análise. Se vários jogadores controlam o mesmo personagem, o convite automático vai para um deles.
 
+**Para alterar o ícone global de uma receita:** entre como mestre e clique no ícone do cartão da receita no grimório de qualquer personagem. Escolha uma imagem pelo seletor de arquivos ou informe um caminho/URL, confira a prévia e clique em **Salvar para todos**. A mesma receita recebe esse ícone para todos os personagens do mundo, inclusive quem a aprender depois. Grimórios e bancadas abertas são atualizados. **Usar ícone padrão** restaura o símbolo da categoria para todos. Apenas o mestre pode fazer essa alteração.
+
 **Para remover uma receita:** entre como mestre, abra o grimório, selecione o personagem e clique em **Remover receita** no cartão correspondente. O botão aparece somente para o mestre e retira o conhecimento apenas desse personagem. Ele pode aprender a receita novamente, e o mestre pode ensiná-la de novo pelo catálogo. A aprovação de pedidos de fabricação confere novamente se o personagem conhece a receita.
 
 Para ensinar uma receita manualmente: abra o grimório, selecione o personagem e use **Catálogo do mestre**, seguido de **Ensinar**. O mestre também encontra o catálogo pelas ferramentas de coleta. **Nova receita** permite cadastrar uma receita própria com nome em português, nome original em inglês opcional, raridade, categorias, partes, tipos de criatura e quantidades. Receitas personalizadas sem nome original mostram no anúncio que o nome em inglês não foi informado.
@@ -123,6 +125,7 @@ Os arquivos de imagem externos não são incluídos no ZIP. As artes de The Witc
 - Receitas aprendidas, estudos e registro de recuperação: flags do próprio ator em `flags.selos-de-drakkenheim`.
 - Componentes: itens `loot` normais com metadados nas flags do módulo.
 - Pedidos, receitas personalizadas e vínculos de resultado: configurações do mundo.
+- Ícones globais de receitas: configuração do mundo `recipeImages`, indexada pela identidade de cada receita.
 - Cache de URLs de imagens: configuração do cliente.
 - Partes retiradas de cada cadáver e vínculo de criatura: flags do token em `flags.selos-de-drakkenheim`. O componente mantém o identificador do token de origem.
 

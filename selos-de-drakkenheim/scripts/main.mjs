@@ -13,6 +13,7 @@ Hooks.once("init",()=>{
   register("promptOnRest",{name:"Perguntar sobre análise após o descanso longo",config:true,type:Boolean,default:true});
   register("requests",{type:Array,default:[]});
   register("recipeResults",{type:Object,default:{}});
+  register("recipeImages",{type:Object,default:{}});
   register("customRecipes",{type:Array,default:[]});
   register("componentImages",{type:Object,default:{}});
   register("wikiImageCache",{scope:"client",type:Object,default:{}});
