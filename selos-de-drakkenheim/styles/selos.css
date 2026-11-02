@@ -47,6 +47,21 @@
 @media(max-width:650px) { .selos-recipe-heading { flex-direction:column; }.selos-row-actions { justify-content:start; }.selos-search { flex-wrap:wrap; }.selos-columns,.selos-custom-row { grid-template-columns:1fr; } }
 
 /* Player panels share an inventory language: item portraits, rarity rims and usable slots. */
+.sd-preview-options { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+.sd-preview-options button[aria-pressed="true"] { border-color:var(--sd-gold); background:#47394e; }
+.sd-preview-details { display:flex; flex-wrap:wrap; gap:12px 26px; margin:0 0 24px; }
+.sd-preview-details > div { min-width:100px; }
+.sd-preview-details dt { color:var(--sd-muted); font-size:12px; }
+.sd-preview-details dd { margin:4px 0 0; overflow-wrap:anywhere; }
+.sd-item-description { line-height:1.65; overflow-wrap:anywhere; }
+.sd-item-description img { max-width:100%; height:auto; }
+.sd-item-description table { width:100%; }
+.sd-item-description a { color:var(--sd-gold); }
+.selos-game[data-selos-panel="result-preview"] .window-content { display:flex; flex-direction:column; overflow:hidden; }
+.selos-game[data-selos-panel="result-preview"] .sd-hero { flex-shrink:0; }
+.selos-game[data-selos-panel="result-preview"] .sd-main { flex:1; min-height:0; overflow:auto; }
+.selos-game[data-selos-panel="result-preview"] .sd-footer { position:static; flex-shrink:0; }
+.selos-game[data-selos-panel="result-preview"] .sd-center-actions { margin:0; }
 .selos-game { --sd-bg:#15171e; --sd-panel:#1d2029; --sd-raised:#252936; --sd-line:#3b3e4b; --sd-text:#eee7d9; --sd-muted:#aaa7ad; --sd-gold:#d4b77d; --sd-purple:#ab91d3; min-width:420px; color:var(--sd-text); }
 .selos-game,.selos-game * { box-sizing:border-box; }
 .selos-game .window-header { background:#1a1b24; border-bottom:1px solid #6c5b3a; }

@@ -1,5 +1,14 @@
 # Histórico
 
+## 1.3.1
+
+- Adiciona **Ver item** no grimório e na bancada para consultar a imagem, a descrição formatada e os detalhes públicos do resultado vinculado.
+- Permite alternar entre resultados e raridades; a bancada abre o item selecionado.
+- Compartilha a descrição pública para consulta mesmo quando a origem está em um compêndio restrito ao mestre, sem trechos secretos não revelados ou notas privadas. Respeita a descrição de itens não identificados.
+- Prepara as descrições dos vínculos existentes quando o mestre ativo abre o mundo.
+- Oferece acesso à ficha original para usuários com permissão de observador. A consulta não adiciona itens nem consome componentes.
+- 152 testes automatizados e fluxos de interface conferidos em duas sessões simuladas.
+
 ## 1.3.0
 
 - Substitui a edição independente de ícones pelo vínculo de itens físicos: o ícone deriva do item vinculado.

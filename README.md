@@ -24,6 +24,7 @@ O pacote requer Foundry V13.347 ou posterior da geração 13 e D&D 5e 5.3.x. Nã
 - O mestre pode ensinar e remover receitas de um personagem.
 - O mestre vincula itens físicos às receitas pelo ícone do grimório ou pelo catálogo. Os vínculos e ícones são globais, com vários resultados por raridade.
 - Sem resultado vinculado, o jogador consulta a receita, mas não pode forjá-la. O item escolhido é entregue ao inventário do solicitante após a aprovação.
+- **Ver item** no grimório e na bancada mostra a descrição e os detalhes públicos de cada resultado vinculado, inclusive de compêndios restritos ao mestre.
 - Componentes superiores podem atender a requisitos de raridade menor.
 - A coleta pode ser configurada por token do mapa ou token protótipo; criaturas sem cadastro recebem uma anatomia inicial estimada.
 - O estudo apresenta os materiais disponíveis antes dos indisponíveis.
@@ -47,4 +48,4 @@ Para gerar o ZIP no Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1
 ```
 
-A versão 1.3.0 passou em 147 testes automatizados e em verificações de interface no navegador com o CSS real do Foundry V13 e APIs simuladas. Foram conferidos vínculos globais, variantes por raridade, entrega do resultado ao solicitante, materiais superiores, coleta no token e protótipo, inferência e ordenação do estudo. A validação no navegador não substitui uma sessão de testes dentro de um mundo real, especialmente com fichas ou módulos de terceiros.
+A versão 1.3.1 passou em 152 testes automatizados e em verificações de interface no navegador com o CSS real do Foundry V13 e APIs simuladas. Foram conferidos a consulta de resultados no grimório e na bancada, múltiplas opções e raridades, descrições de compêndios restritos, ausência de trechos secretos e preservação do inventário durante a consulta, além dos fluxos anteriores de coleta, estudo e fabricação. A validação no navegador não substitui uma sessão de testes dentro de um mundo real, especialmente com fichas ou módulos de terceiros.

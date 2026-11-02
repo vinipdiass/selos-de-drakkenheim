@@ -14,7 +14,7 @@ Depois, abra o mundo D&D 5e e ative **Selos de Drakkenheim** em **Gerenciar mód
 
 ## Instalação manual
 
-1. Extraia `selos-de-drakkenheim-v1.3.0.zip` dentro da pasta `Data/modules` do seu Foundry.
+1. Extraia `selos-de-drakkenheim-v1.3.1.zip` dentro da pasta `Data/modules` do seu Foundry.
 2. Confirme que o arquivo está em `Data/modules/selos-de-drakkenheim/module.json`, sem uma pasta duplicada no caminho.
 3. Reinicie o Foundry, abra seu mundo D&D 5e e ative **Selos de Drakkenheim** em **Gerenciar módulos**.
 
@@ -77,6 +77,8 @@ Se o mestre inicia o descanso e há um proprietário jogador conectado, o convit
 **Para vincular resultados e alterar o ícone de uma receita:** entre como mestre e clique no ícone da receita no grimório de qualquer personagem, ou use **Vincular resultado** no catálogo. Arraste um item físico do mundo, compêndio ou inventário para a área de vínculo; também é possível colar seu UUID. O ícone passa a ser o do item vinculado para todos os personagens. A edição independente de imagem foi substituída por esse vínculo.
 
 Nas receitas de raridade variável, selecione a raridade e vincule as opções desejadas para aquela faixa. Podem existir vários resultados por raridade. O jogador escolhe o item de resultado na bancada. Sem vínculo na raridade escolhida, a fabricação fica bloqueada; os requisitos da receita continuam disponíveis para consulta. O primeiro resultado disponível fornece o ícone padrão do cartão, e a bancada usa a imagem do resultado selecionado. Vínculos antigos são convertidos automaticamente quando o mestre ativo entra.
+
+**Ver o item vinculado:** o botão **Ver item** aparece no cartão da receita no grimório e junto ao resultado escolhido na bancada. Ele abre a imagem, a descrição formatada, a raridade, o tipo e os detalhes públicos disponíveis, como peso, preço e propriedades. Havendo várias opções, a consulta permite alternar entre os resultados e suas raridades. Quando o jogador tem permissão sobre o item original, também aparece **Abrir ficha do item**. A consulta funciona mesmo quando o item está em um compêndio restrito ao mestre: ao vincular, o módulo compartilha apenas a descrição pública, removendo trechos secretos não revelados. Itens não identificados usam sua descrição não identificada. Vínculos existentes recebem essa descrição automaticamente quando o mestre ativo abre o mundo após a atualização; para renovar uma descrição compartilhada depois de editar a origem, vincule o mesmo item novamente. Consultar o resultado não cria itens nem consome materiais.
 
 **Para remover uma receita:** entre como mestre, abra o grimório, selecione o personagem e clique em **Remover receita** no cartão correspondente. O botão aparece somente para o mestre e retira o conhecimento apenas desse personagem. Ele pode aprender a receita novamente, e o mestre pode ensiná-la de novo pelo catálogo. A aprovação de pedidos de fabricação confere novamente se o personagem conhece a receita.
 
