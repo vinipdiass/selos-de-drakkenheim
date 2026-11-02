@@ -86,13 +86,16 @@
 .sd-count { display:grid; place-items:center; min-width:29px; height:29px; border:1px solid #66543d; border-radius:50%; color:#dec392; font-size:12px; }
 .sd-search { display:flex; gap:8px; margin-bottom:19px; }.sd-search input { width:100%; min-width:100px; }.sd-search select { width:160px; flex:0 0 160px; font-size:12px; }
 .sd-recipe-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; align-items:start; }
+.sd-binding-missing { color:#d4b77d !important; font-size:11px; line-height:1.5; margin:10px 0; }
+.sd-result-choices { padding:14px 25px; display:flex; align-items:center; flex-wrap:wrap; gap:8px; border-bottom:1px solid #514457; }.sd-result-choices > span { width:100%; }.sd-result-choices button { font-size:12px; }.sd-result-choices button[aria-pressed=true] { border-color:#d4b77d; background:#51402f; }
+.sd-result-drop { padding:26px; margin:15px 0; text-align:center; border:1px dashed #b99b62; border-radius:6px; color:#e5cca0; background:#292331; }.sd-linked-results article { display:flex; align-items:center; gap:12px; padding:12px; margin-bottom:10px; border:1px solid #514457; border-radius:5px; }.sd-linked-results img { width:48px; height:48px; object-fit:contain; border:0; }.sd-linked-results article > div { flex:1; min-width:0; }.sd-linked-results small { display:block; overflow-wrap:anywhere; color:#b4a5bb; font-size:10px; }.sd-linked-results button { width:auto; font-size:11px; }
+.sd-harvest-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:16px 0; }.sd-harvest-options label { display:flex; align-items:center; gap:7px; padding:9px; background:#25212d; border:1px solid #53465e; border-radius:4px; cursor:pointer; }.sd-harvest-options small { display:block; color:#b4a5bb; font-size:10px; }.sd-harvest-options strong { font-size:12px; font-weight:normal; }
 .sd-recipe-card { position:relative; padding:18px 16px 14px; border:1px solid #48414f; border-top:2px solid var(--rarity); border-radius:6px; background:linear-gradient(145deg,#2d2937,#1c1e28); overflow:hidden; }
 .sd-recipe-card::before { content:""; position:absolute; width:100px; height:100px; top:-45px; right:-45px; border:1px solid #d6bc8d12; border-radius:50%; }
 .sd-recipe-crest { width:46px; height:46px; margin-bottom:10px; display:grid; place-items:center; border:1px solid #8c76534a; border-radius:50%; color:var(--rarity); background:#14151d; font-size:20px; }
 .sd-recipe-crest > img { width:38px; height:38px; object-fit:contain; border:0; border-radius:50%; }
-.selos-game .sd-recipe-card > .sd-edit-recipe-icon { position:relative; width:46px; height:46px; min-height:46px; margin:0 0 10px; padding:3px; display:grid; border:1px solid #8c76537a; border-radius:50%; color:var(--rarity); background:#14151d; font-size:20px; }
+.selos-game .sd-recipe-card > .sd-link-recipe { position:relative; width:46px; height:46px; min-height:46px; margin:0 0 10px; padding:3px; display:grid; border:1px solid #8c76537a; border-radius:50%; color:var(--rarity); background:#14151d; font-size:20px; }
 .sd-icon-edit-mark { position:absolute; right:-3px; bottom:-3px; display:grid; place-items:center; width:17px; height:17px; border:1px solid #967d54; border-radius:50%; color:#edd3a7; background:#292333; font-size:8px; }
-.selos-icon-dialog .selos-recipe-icon-editor { line-height:1.5; }.selos-recipe-icon-editor .selos-icon-preview { width:78px; height:78px; margin:14px auto; display:grid; place-items:center; border:1px solid #967d54; border-radius:8px; background:#22212c; color:#ddc398; font-size:30px; }.selos-icon-preview img { width:70px; height:70px; object-fit:contain; border:0; }.selos-recipe-icon-editor [hidden] { display:none !important; }.selos-recipe-icon-editor [data-browse-recipe-icon] { width:auto; height:auto; min-height:32px; padding:5px 10px; }.selos-recipe-icon-editor input { width:100%; }
 .selos-game[data-selos-panel="forge"] .sd-hero-art img { object-fit:contain; padding:5px; }
 .sd-recipe-card h2 { font-size:19px; line-height:1.2; margin:7px 0 8px; min-height:45px; }
 .sd-recipe-card > p { font-size:11px; color:#b8aeba; margin:0 0 12px; }.sd-recipe-card > p span { color:#958c9e; }
@@ -157,6 +160,12 @@
 .sd-workshop-choices,.sd-rarity-options { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }.sd-workshop-choices button,.sd-rarity-options button { width:auto; min-height:28px; font-size:10px; padding:5px 9px; background:transparent; border-color:#5c4b62; }.sd-workshop-choices button[aria-pressed=true],.sd-rarity-options button[aria-pressed=true] { color:#f1d8a9; border-color:#b28c50; background:#88663629; }
 .sd-rarity-options { padding:15px 25px 0; margin:0; align-items:center; }.sd-rarity-options > span { color:#c2afc8; font-size:11px; margin-right:8px; }
 .sd-field { display:block; font-size:11px; color:#bfb2c8; }.sd-field span { display:block; margin-bottom:7px; }
+.sd-field input,.sd-field select { width:100%; }
+.selos-game[data-selos-panel="bindings"] h2 { font-size:22px; margin:22px 0 12px; }
+.selos-game:is([data-selos-panel="bindings"],[data-selos-panel="harvest-config"]) .window-content { display:flex; flex-direction:column; overflow:hidden; }
+.selos-game:is([data-selos-panel="bindings"],[data-selos-panel="harvest-config"]) .window-content > :not(.sd-main) { flex-shrink:0; }
+.selos-game:is([data-selos-panel="bindings"],[data-selos-panel="harvest-config"]) .sd-main { flex:1 1 0; min-height:0; overflow:auto; }
+.selos-game:is([data-selos-panel="bindings"],[data-selos-panel="harvest-config"]) .sd-footer { position:static; }
 .sd-forge-footer > span { font-size:11px; line-height:1.5; color:#bbb0c0; }.sd-forge-footer > span > i { color:#b49766; margin-right:5px; }
 .sd-submitted .sd-empty { border:0; min-height:320px; background:radial-gradient(ellipse,#8c6b4c18,transparent 70%); }.sd-center-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:20px 0; }.sd-center-actions button { width:auto; }
 .sd-study-intro { display:flex; gap:20px; align-items:center; justify-content:space-between; margin-bottom:22px; }.sd-study-intro p { margin:0; color:#c1b3c9; font-size:13px; line-height:1.6; max-width:500px; }.sd-selection-count { color:#ead1a5; border:1px solid #836c49; border-radius:4px; font-size:11px; padding:9px 12px; white-space:nowrap; background:#5b432527; }

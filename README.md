@@ -22,7 +22,11 @@ O pacote requer Foundry V13.347 ou posterior da geração 13 e D&D 5e 5.3.x. Nã
 - Descobertas anunciadas no chat com os nomes dos itens em português e inglês.
 - Grimório, bancada com arrasto de componentes e fabricação com aprovação do mestre.
 - O mestre pode ensinar e remover receitas de um personagem.
-- Clique no ícone de uma receita como mestre para alterá-lo globalmente para todos os personagens, com prévia, seletor de arquivos, URL e restauração do padrão.
+- O mestre vincula itens físicos às receitas pelo ícone do grimório ou pelo catálogo. Os vínculos e ícones são globais, com vários resultados por raridade.
+- Sem resultado vinculado, o jogador consulta a receita, mas não pode forjá-la. O item escolhido é entregue ao inventário do solicitante após a aprovação.
+- Componentes superiores podem atender a requisitos de raridade menor.
+- A coleta pode ser configurada por token do mapa ou token protótipo; criaturas sem cadastro recebem uma anatomia inicial estimada.
+- O estudo apresenta os materiais disponíveis antes dos indisponíveis.
 
 Leia o [manual completo](selos-de-drakkenheim/README.md) para configurar criaturas, receitas e itens de resultado. Os [Releases](https://github.com/vinipdiass/selos-de-drakkenheim/releases) incluem o manifesto e o ZIP para instalação manual.
 
@@ -43,4 +47,4 @@ Para gerar o ZIP no Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1
 ```
 
-A versão 1.2.0 passou em 132 testes automatizados e em verificações de interface no navegador com o CSS real do Foundry V13 e APIs simuladas. O ícone global foi conferido em duas sessões, incluindo mestre e jogador, atualização da bancada, persistência e restauração do padrão. A validação no navegador não substitui uma sessão de testes dentro de um mundo real, especialmente com fichas ou módulos de terceiros.
+A versão 1.3.0 passou em 147 testes automatizados e em verificações de interface no navegador com o CSS real do Foundry V13 e APIs simuladas. Foram conferidos vínculos globais, variantes por raridade, entrega do resultado ao solicitante, materiais superiores, coleta no token e protótipo, inferência e ordenação do estudo. A validação no navegador não substitui uma sessão de testes dentro de um mundo real, especialmente com fichas ou módulos de terceiros.

@@ -1,6 +1,7 @@
 import {ID,RARITIES,TYPES,assert,normalize,rarityFromCR,componentData,requireHarvestTools} from "./core.mjs";
 import {catalog,monsterFromActor,componentImage,owns,primaryGM} from "./catalog.mjs";
 import {serialize,isAuthority} from "./service.mjs";
+import {inferHarvestParts,inferredCreatureType,harvestConfigFor,cleanHarvestConfig} from "./anatomy.mjs";
 
 export const partKey=part=>`${part.category}:${normalize(part.part)}`;
 export function isDefeatedEnemy(token) {
@@ -16,10 +17,12 @@ export function harvestDestination(user=game.user,controlled=globalThis.canvas?.
   return available.length===1?available[0]:null;
 }
 const profileName=value=>normalize(value).replace(/[’']/g,"").replace(/\s+/g," ");
-export function harvestProfile(token) {
+export function harvestProfile(token,{ignoreConfig=false}={}) {
   if(!token?.actor)return null;
   const base=game.actors.get(token.actorId);
-  const explicit=token.getFlag(ID,"harvestMonsterId") ?? token.actor.getFlag(ID,"harvestMonsterId") ?? base?.getFlag(ID,"harvestMonsterId");
+  const raw=ignoreConfig?null:(harvestConfigFor(token)??base?.prototypeToken?.flags?.[ID]?.harvestConfig);
+  let config;try{config=raw?cleanHarvestConfig(raw):null;}catch{return null;}
+  const explicit=ignoreConfig?null:config?(config.monsterId||null):(token.getFlag?.(ID,"harvestMonsterId")||token.actor.getFlag?.(ID,"harvestMonsterId")||base?.getFlag?.(ID,"harvestMonsterId"));
   let profile=explicit?catalog.monsters.find(monster=>monster.id===explicit):null;
   // Invalid explicit mappings never silently fall back to a different anatomy.
   if(explicit && !profile)return null;
@@ -32,16 +35,34 @@ export function harvestProfile(token) {
       if(matches.length===1)profile=matches[0];
     }
   }
-  if(!profile)return null;
   const actual=monsterFromActor(token.actor);
-  const actualType=token.actor.system.details?.type?.value??token.actor.system.details?.type;
-  const rarity=profile.rarity || rarityFromCR(actual.cr);
+  const declared=token.actor.system?.details?.type?.value??token.actor.system?.details?.type;
+  const actualType=TYPES[declared]?declared:(profile?.type??inferredCreatureType(token.actor));
+  const rarity=config?.rarity||profile?.rarity || rarityFromCR(actual.cr)||"common";
   if(!RARITIES[rarity])return null;
-  return {...actual,id:profile.id,catalogName:profile.name,rarity,parts:profile.parts??[],type:TYPES[actualType]?actualType:profile.type};
+  const configured=config?.mode==="custom";
+  let parts=configured?config.parts:(profile?.parts?.length?profile.parts:inferHarvestParts(token.actor,actualType));
+  if(!configured&&actualType==="construct")parts=parts.filter(part=>normalize(part.part)!=="monster blood");
+  return {...actual,id:profile?.id??actual.id,catalogName:profile?.name??actual.name,rarity,parts,type:actualType,inferred:!profile?.parts?.length,configured};
 }
 export function availableHarvestParts(token) {
   const monster=harvestProfile(token),ledger=token.getFlag(ID,"harvests")??{};
   return monster?.parts.filter(part=>!ledger[partKey(part)] || ledger[partKey(part)].status!=="completed")??[];
+}
+export function saveHarvestConfig(target,config,{prototype=false}={}){
+  return serialize(async()=>{
+    assert(game.user.isGM,"Somente o mestre pode configurar os componentes de uma criatura.");
+    const value=cleanHarvestConfig(config);
+    if(prototype){
+      assert(target?.documentName==="Actor"&&target.type==="npc","Selecione uma criatura para configurar o token protótipo.");
+      await target.update({[`prototypeToken.flags.${ID}.harvestConfig`]:value});
+    }else{
+      assert(target?.documentName==="Token"&&target.actor?.type==="npc","Selecione um token de criatura.");
+      await target.setFlag(ID,"harvestConfig",value);
+    }
+    Hooks.callAll(`${ID}.updated`);
+    return value;
+  });
 }
 function validateSource(token,user,destination) {
   assert(isDefeatedEnemy(token),"A coleta exige um inimigo com exatamente 0 PV.");

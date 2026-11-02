@@ -1,5 +1,6 @@
 import {ID, CATEGORIES, TYPES, normalize, safeImage, sourceTraitsFromActor} from "./core.mjs";
 import {WITCHER_IMAGES} from "./images.mjs";
+import {allResults} from "./bindings.mjs";
 
 export let catalog;
 export async function loadCatalog() {
@@ -10,8 +11,13 @@ export async function loadCatalog() {
 }
 export function recipes() {
   const changes=game.settings.get(ID,"recipeResults");
-  const images=game.settings.get(ID,"recipeImages")??{};
-  return [...catalog.recipes,...game.settings.get(ID,"customRecipes")].map(r=>({...r,...changes[r.id],img:safeImage(images[r.id]??r.img,"")}));
+  return [...catalog.recipes,...game.settings.get(ID,"customRecipes")].map(r=>{
+    const entry=changes[r.id]??{},legacy=entry.resultUuid??r.resultUuid;
+    const bindings=entry.bindings??(legacy?{[r.rarity==="varies"?"common":r.rarity]:[{uuid:legacy,name:r.name,img:"",legacy:true}]}:{});
+    const recipe={...r,...entry,bindings};
+    recipe.img=safeImage(allResults(recipe)[0]?.img,"");
+    return recipe;
+  });
 }
 export const getRecipe = id => recipes().find(r=>r.id===id);
 export const components = actor => actor.items.filter(i=>i.getFlag(ID,"kind")==="component" && i.system.quantity>0);

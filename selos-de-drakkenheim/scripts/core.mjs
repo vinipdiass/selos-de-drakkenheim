@@ -113,10 +113,10 @@ function sourceMatches(source, component, strictSpecial) {
     return words.length>0 && (!namedType || component.creatureType===namedType) && words.every(word=>monsterWords.has(word));
   });
 }
-export function matchSlot(slot, item, rarity, {strictSpecial=false}={}) {
+export function matchSlot(slot, item, rarity, {strictSpecial=false,allowHigherRarity=true}={}) {
   const c=item.flags?.[ID] ?? item.component;
   const quantity=Number(item.system?.quantity ?? item.quantity ?? 0);
-  if (!c || !RARITIES[rarity] || !c.part || c.category !== slot.category || c.rarity !== rarity || !Number.isFinite(quantity) || quantity < 1) return false;
+  if (!c || !RARITIES[rarity] || !c.part || c.category !== slot.category || !(allowHigherRarity?workshopMeets(c.rarity,rarity):c.rarity===rarity) || !Number.isFinite(quantity) || quantity < 1) return false;
   return slot.alternatives.some(a=>{
     const actual=singular(c.part);
     const partOkay=genericParts.has(a.part) || a.part==="any" || actual===a.part || (a.part==="any dragon dust" && actual==="dragon dust");
@@ -146,7 +146,7 @@ export function validateCombination(recipe,items,assignments,rarity) {
 }
 export function canStudy(item,recipe) {
   const rarity=item.flags?.[ID]?.rarity;
-  return recipeSlots(recipe).some(s=>matchSlot(s,item,recipe.rarity==="varies" ? rarity : recipe.rarity,{strictSpecial:true}));
+  return recipeSlots(recipe).some(s=>matchSlot(s,item,recipe.rarity==="varies" ? rarity : recipe.rarity,{strictSpecial:true,allowHigherRarity:false}));
 }
 export function studyCandidates(item, allRecipes, knownIds=[]) {
   const known=new Set(knownIds),seen=new Set();

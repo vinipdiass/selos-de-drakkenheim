@@ -6,6 +6,9 @@ import {ingestHarvestMessage,handleHarvestResult,rescanHarvestRequests} from "./
 import {installTokenMenu,uninstallTokenMenu,openTokenHarvest,configureTokenHarvest} from "./token-menu.mjs";
 import {refreshPlayerPanels,refreshLootPanels,closeLootPanels} from "./player-ui.mjs";
 
+import {migrateResultLinks} from "./result-links.mjs";
+import {openHarvestConfig} from "./harvest-ui.mjs";
+
 let ready=false;
 Hooks.once("init",()=>{
   const register=(key,config)=>game.settings.register(ID,key,{scope:"world",config:false,...config});
@@ -21,6 +24,7 @@ Hooks.once("init",()=>{
 Hooks.once("ready",()=>run(async()=>{
   if(game.system.id!=="dnd5e")return;
   await loadCatalog();ready=true;
+  await migrateResultLinks();
   game.modules.get(ID).api={openBook,openHarvest:()=>openBook(undefined,"harvest"),openRequests:()=>openBook(undefined,"requests"),openStudy,editComponentTraits,openTokenHarvest,configureTokenHarvest};
   if(canvas.ready)installTokenMenu();
   await rescanRequests();
@@ -36,8 +40,11 @@ Hooks.on("getSceneControlButtons",controls=>{
 Hooks.on("getHeaderControlsApplicationV2",(application,controls)=>{
   const actor=application.document ?? application.actor;
   if(!ready)return;
+  if(application.isPrototype&&application.actor?.type==="npc"&&game.user.isGM){
+    controls.push({label:"Configurar componentes",icon:"fa-solid fa-screwdriver-wrench",action:"selosPrototypeComponents",onClick:()=>run(()=>openHarvestConfig(application.actor,{prototype:true,sourceApplication:application}))});return;
+  }
   if(actor?.documentName==="Token" && game.user.isGM && actor.actor?.type==="npc"){
-    controls.push({label:"Configurar componentes",icon:"fa-solid fa-paw",action:"selosTokenComponents",onClick:()=>run(()=>configureTokenHarvest(actor))});return;
+    controls.push({label:"Configurar componentes",icon:"fa-solid fa-paw",action:"selosTokenComponents",onClick:()=>run(()=>configureTokenHarvest(actor,{sourceApplication:application}))});return;
   }
   if(actor?.documentName==="Item" && game.user.isGM && actor.getFlag(ID,"kind")==="component"){
     controls.push({label:"Conferir origem do componente",icon:"fa-solid fa-paw",action:"selosComponentSource",onClick:()=>run(()=>editComponentTraits(actor))});return;

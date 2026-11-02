@@ -1,5 +1,5 @@
 import {ID,escapeHTML as e} from "./core.mjs";
-import {catalog} from "./catalog.mjs";
+import {openHarvestConfig} from "./harvest-ui.mjs";
 import {isDefeatedEnemy,harvestProfile} from "./harvest.mjs";
 import {openLoot} from "./player-ui.mjs";
 
@@ -13,13 +13,7 @@ function tokenAt(event){
   return candidates.find(token=>!token.isPreview && token.isVisible!==false && token.visible!==false && (game.user.isGM || !token.document.hidden) && (token.shape?.contains?token.shape.contains(point.x-token.x,point.y-token.y):token.bounds?.contains(point.x,point.y)));
 }
 export function openTokenHarvest(token){return openLoot(token);}
-export async function configureTokenHarvest(token){
-  if(!game.user.isGM)return;
-  const current=harvestProfile(token),{DialogV2}=foundry.applications.api;
-  const id=await DialogV2.wait({window:{title:"Componentes da criatura"},position:{width:560},content:`<div class="selos-form"><p>Vincule <strong>${e(token.name??token.actor.name)}</strong> a uma criatura do catálogo. Os jogadores verão somente as partes cadastradas para ela.</p><label class="selos-field"><span>Criatura do catálogo</span><select name="monsterId">${[...catalog.monsters].sort((a,b)=>a.name.localeCompare(b.name)).map(monster=>`<option value="${monster.id}" ${monster.id===current?.id?"selected":""}>${e(monster.name)}</option>`).join("")}</select></label></div>`,buttons:[{action:"save",label:"Salvar",callback:(_event,_button,dialog)=>dialog.element.querySelector('[name="monsterId"]').value},{action:"cancel",label:"Cancelar",callback:()=>false}],rejectClose:false});
-  if(!id)return;
-  await token.setFlag(ID,"harvestMonsterId",id);ui.notifications.info("Componentes vinculados a esta criatura.");
-}
+export function configureTokenHarvest(token,options){return openHarvestConfig(token,options);}
 export function installTokenMenu(){
   controller?.abort();controller=new AbortController();closeTokenMenu();
   const view=globalThis.canvas?.app?.view;if(!view)return;

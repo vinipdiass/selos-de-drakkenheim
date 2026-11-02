@@ -52,7 +52,7 @@ test("restrições de espécie e raridade não aceitam outra criatura",()=>{
   assert.equal(matchSlot(slot,item("hide","Scales",{monster:"Adult Blue Dragon",type:"dragon"}),"common"),true);
   assert.equal(matchSlot(slot,item("hide","Scales",{monster:"Adult Red Dragon",type:"dragon"}),"common"),false);
   assert.equal(matchSlot(slot,item("hide","Scales",{monster:"Blue Slaad",type:"aberration"}),"common"),false);
-  assert.equal(matchSlot(slot,item("hide","Scales",{monster:"Adult Blue Dragon",type:"dragon",rarity:"rare"}),"common"),false);
+  assert.equal(matchSlot(slot,item("hide","Scales",{monster:"Adult Blue Dragon",type:"dragon",rarity:"rare"}),"common"),true);
 });
 test("pó e ânima respeitam seus tipos específicos",()=>{
   const r=recipe("Amulet of Primal Wisdom"),slots=recipeSlots(r);

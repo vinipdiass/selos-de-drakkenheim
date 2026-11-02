@@ -1,5 +1,6 @@
-import {ID,RARITIES,assert,studyLimit,drawStudyRecipes,validateCombination,workshopMeets,escapeHTML,safeImage} from "./core.mjs";
+import {ID,RARITIES,assert,studyLimit,drawStudyRecipes,validateCombination,workshopMeets,escapeHTML} from "./core.mjs";
 import {getRecipe,recipes,components,knownRecipes,owns,primaryGM} from "./catalog.mjs";
+import {selectedResult,PHYSICAL_ITEMS} from "./bindings.mjs";
 
 let queue=Promise.resolve();
 export function serialize(task) {const result=queue.then(task);queue=result.catch(()=>{});return result;}
@@ -28,20 +29,6 @@ export function revokeRecipe(actor,recipeId) {
     await actor.setFlag(ID,"recipes",remaining);
     Hooks.callAll(`${ID}.updated`,actor);
     return true;
-  });
-}
-export function setRecipeImage(recipeId,value) {
-  return serialize(async()=>{
-    assert(game.user.isGM,"Somente o mestre pode alterar o ícone global de uma receita.");
-    assert(getRecipe(recipeId),"Receita não encontrada.");
-    assert(typeof value==="string","Informe o caminho ou URL da imagem.");
-    const path=value.trim();
-    assert(path.length<=2048 && (!path || safeImage(path,"")===path),"Informe um caminho ou URL válido para a imagem.");
-    const images={...(game.settings.get(ID,"recipeImages")??{})};
-    if(path)images[recipeId]=path;else delete images[recipeId];
-    await game.settings.set(ID,"recipeImages",images);
-    Hooks.callAll(`${ID}.updated`);
-    return path;
   });
 }
 async function addRecipes(actor,ids,source) {
@@ -93,15 +80,17 @@ export async function studyComponents(actor,itemIds,expectedRestId) {
   }
   return {learned:additions,unavailable};
 }
-export async function submitRequest(actor,{recipeId,assignments,rarity,workshop,notes}) {
+export async function submitRequest(actor,{recipeId,assignments,rarity,workshop,notes,resultUuid}) {
   assert(owns(actor),"Você precisa controlar este personagem.");
   const recipe=getRecipe(recipeId);
   assert(recipe && knownRecipes(actor).some(r=>r.id===recipeId),"O personagem precisa conhecer a receita.");
   const actualRarity=recipe.rarity==="varies" ? rarity : recipe.rarity;
+  const result=selectedResult(recipe,actualRarity,resultUuid);
+  assert(result,"O mestre precisa vincular um item de resultado para esta receita e raridade. Se houver várias opções, escolha o item.");
   const requiredWorkshop=recipe.workshop==="varies" ? actualRarity : recipe.workshop;
   validateCombination(recipe,components(actor),assignments,actualRarity);
   assert(workshopMeets(workshop,requiredWorkshop),"A oficina informada tem raridade insuficiente.");
-  const request={id:foundry.utils.randomID(),actorUuid:actor.uuid,recipeId,assignments,rarity:actualRarity,workshop,notes:String(notes??"").slice(0,2000),submittedAt:Date.now()};
+  const request={id:foundry.utils.randomID(),actorUuid:actor.uuid,recipeId,assignments,resultUuid:result.uuid,rarity:actualRarity,workshop,notes:String(notes??"").slice(0,2000),submittedAt:Date.now()};
   const gmIds=game.users.filter(u=>u.isGM).map(u=>u.id);
   assert(gmIds.length,"É necessário haver um mestre cadastrado no mundo.");
   await ChatMessage.create({content:`<div class="selos-chat"><h3>Pedido de fabricação</h3><p><strong>${escapeHTML(actor.name)}</strong> deseja fabricar <strong>${escapeHTML(recipe.name)}</strong>.</p><p>Oficina informada: ${RARITIES[workshop]}. Aguardando aprovação do mestre.</p><button type="button" data-selos-request="${request.id}">Revisar fabricação</button></div>`,whisper:[...new Set([...gmIds,game.user.id])],speaker:ChatMessage.getSpeaker({actor}),flags:{[ID]:{kind:"craft-request",request}}});
@@ -120,7 +109,9 @@ export function ingestMessage(message) {
     const recipe=getRecipe(data.recipeId);
     if(!recipe || !knownRecipes(actor).some(r=>r.id===recipe.id)) return;
     if(!Array.isArray(data.assignments) || data.assignments.length>50) return;
-    await saveRequest({id:data.id,actorUuid:actor.uuid,recipeId:recipe.id,assignments:data.assignments.map(String),rarity:recipe.rarity==="varies" ? data.rarity : recipe.rarity,workshop:data.workshop,notes:String(data.notes??"").slice(0,2000),submittedAt:message.timestamp,submittedBy:message.author.id,messageId:message.id,status:"pending"});
+    const tier=recipe.rarity==="varies"?data.rarity:recipe.rarity,result=selectedResult(recipe,tier,data.resultUuid);
+    if(!result)return;
+    await saveRequest({resultUuid:result.uuid,id:data.id,actorUuid:actor.uuid,recipeId:recipe.id,assignments:data.assignments.map(String),rarity:recipe.rarity==="varies" ? data.rarity : recipe.rarity,workshop:data.workshop,notes:String(data.notes??"").slice(0,2000),submittedAt:message.timestamp,submittedBy:message.author.id,messageId:message.id,status:"pending"});
     ui.notifications.info(`Novo pedido de fabricação: ${actor.name}.`);
   });
 }
@@ -178,13 +169,16 @@ export function resolveRequest(id,{approve,resultUuid,conditionsConfirmed=false,
     const requiredWorkshop=recipe.workshop==="varies" ? request.rarity : recipe.workshop;
     assert(workshopConfirmed && workshopMeets(request.workshop,requiredWorkshop),"Confirme que a oficina informada está disponível e tem a raridade exigida.");
     assert(!manual.length || conditionsConfirmed,"Confirme os requisitos especiais da criatura na ficha do monstro.");
-    const source=await fromUuid(resultUuid || recipe.resultUuid || "");
-    assert(source?.documentName==="Item" && ["weapon","equipment","consumable","tool","loot","container"].includes(source.type),"Vincule um item físico do mundo ou de um compêndio para usar como resultado.");
+    const linked=selectedResult(recipe,request.rarity,request.resultUuid);
+    assert(linked,"O item de resultado não está mais vinculado a esta receita e raridade.");
+    assert(!resultUuid||resultUuid===linked.uuid,"O resultado precisa ser o item vinculado escolhido no pedido.");
+    const source=await fromUuid(linked.uuid);
+    assert(source?.documentName==="Item" && PHYSICAL_ITEMS.has(source.type),"Vincule um item físico do mundo ou de um compêndio para usar como resultado.");
     const output=source.toObject();delete output._stats;delete output.folder;delete output.ownership;
-    output._id=foundry.utils.randomID();output.name=recipe.name;output.system.quantity=1;output.system.rarity=request.rarity;output.system.container=null;
+    output._id=foundry.utils.randomID();output.name=source.name;output.system.quantity=1;output.system.rarity=request.rarity;output.system.container=null;
     if("equipped"in output.system)output.system.equipped=false;
     if("attuned"in output.system)output.system.attuned=false;
-    output.flags ??={};output.flags[ID]={kind:"crafted",recipeId:recipe.id,requestId:id,craftedAt:Date.now(),approvedBy:game.user.id};
+    output.flags ??={};output.flags[ID]={kind:"crafted",recipeId:recipe.id,resultUuid:linked.uuid,requestId:id,craftedAt:Date.now(),approvedBy:game.user.id};
     const transaction={requestId:id,status:"processing",outputId:output._id,before:Object.keys(counts).map(itemId=>actor.items.get(itemId).toObject())};
     await actor.setFlag(ID,"transaction",transaction);
     try {

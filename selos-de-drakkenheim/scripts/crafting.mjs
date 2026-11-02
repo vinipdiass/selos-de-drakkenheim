@@ -1,4 +1,4 @@
-import {ID,RARITIES,CATEGORIES,assert,recipeSlots,matchSlot,validateCombination} from "./core.mjs";
+import {ID,RARITIES,CATEGORIES,assert,recipeSlots,matchSlot,validateCombination,workshopMeets} from "./core.mjs";
 
 /** A craft reserves units in the interface. Inventory changes only after GM approval. */
 export class CraftingPlan {
@@ -18,7 +18,7 @@ export class CraftingPlan {
     if(!slot||!item)return "Este material não está mais no inventário.";
     const component=item.flags?.[ID];
     if(component?.category!==slot.category)return `Este espaço pede ${CATEGORIES[slot.category].toLocaleLowerCase("pt-BR")}.`;
-    if(component.rarity!==this.rarity)return `Este espaço pede um componente de raridade ${RARITIES[this.rarity].toLocaleLowerCase("pt-BR")}.`;
+    if(!workshopMeets(component.rarity,this.rarity))return `Este espaço pede um componente de raridade ${RARITIES[this.rarity].toLocaleLowerCase("pt-BR")} ou superior.`;
     if(!matchSlot(slot,item,this.rarity))return "A parte ou a criatura de origem não atende a este requisito.";
     if(this.reserved(itemId,index)>=Number(item.system.quantity))return "Todas as unidades deste material já estão na bancada.";
     if(slot.distinct||this.recipe.other){

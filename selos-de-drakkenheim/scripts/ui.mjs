@@ -1,7 +1,9 @@
 import {ID,RARITIES,CATEGORIES,TYPES,escapeHTML as e,normalize,rarityFromCR,componentData,recipeSlots,validateCombination,safeImage,sourceTraitsFromActor,requireHarvestTools} from "./core.mjs";
 import {catalog,recipes,getRecipe,components,knownRecipes,accessibleActors,owns,monsterIndex,resolveMonster,genericParts,componentImage,primaryGM} from "./catalog.mjs";
 import {grantRecipe,requests,resolveRequest,recoverRequest,isAuthority} from "./service.mjs";
-import {openPlayerBook,openPlayerStudy,openForge,refreshPlayerPanels} from "./player-ui.mjs";
+import {linkRecipeItem} from "./result-links.mjs";
+import {selectedResult} from "./bindings.mjs";
+import {openPlayerBook,openPlayerStudy,openForge,refreshPlayerPanels,openRecipeBinding} from "./player-ui.mjs";
 
 const {ApplicationV2,DialogV2}=foundry.applications.api;
 const option=(value,label,selected)=>`<option value="${e(value)}" ${value===selected?"selected":""}>${e(label)}</option>`;
@@ -31,7 +33,7 @@ export class SelosApp extends ApplicationV2 {
     const search=`<div class="selos-search"><input type="search" data-filter="search" value="${e(this.search)}" placeholder="Pesquisar receita…" aria-label="Pesquisar receita"><select data-filter="rarity">${option("","Todas as raridades",this.rarity)}${options({...RARITIES,varies:"Variável"},this.rarity)}</select>${game.user.isGM && this.view==="catalogue"?button("new-recipe","Nova receita","fa-plus"):""}</div>`;
     const allowance=actor?.getFlag(ID,"study");
     const rest=actor && this.view==="book" && allowance ? `<div class="selos-callout">Descanso longo: ${Math.max(0,allowance.limit-allowance.used.length)} análise(s) disponível(is). ${button("study","Analisar componentes","fa-magnifying-glass")}</div>`:"";
-    const list=rows.map(r=>`<article class="selos-recipe" data-recipe="${e(r.id)}" data-search="${e(normalize(`${r.name} ${r.originalName}`))}" data-rarity="${r.rarity}"><div class="selos-recipe-heading"><div><h2>${e(r.name)}</h2><span class="selos-rarity ${r.rarity}">${e(RARITIES[r.rarity]??"Variável")}</span><span>${e(r.category)}</span></div><div class="selos-row-actions">${this.view==="catalogue"?button("grant",known.has(r.id)?"Já conhecida":"Ensinar","fa-graduation-cap",`data-id="${r.id}" ${!actor || known.has(r.id)?"disabled":""}`)+button("link","Vincular resultado","fa-link",`data-id="${r.id}"`):button("craft","Fabricar","fa-hammer",`data-id="${r.id}"`)}</div></div><details><summary>Componentes e requisitos (${recipeSlots(r).length})</summary><p>Oficina: <strong>${e(RARITIES[r.workshop]??"Mesma raridade do item")}</strong></p><ul>${r.requirements.map(q=>`<li><strong>${CATEGORIES[q.category]}:</strong> ${e(q.label)}</li>`).join("")}</ul>${r.other?`<p>${e(r.other)}</p>`:""}${r.attunement?`<p>${e(r.attunement)}</p>`:""}<p class="selos-note">${r.resultUuid?"Resultado vinculado a um item do Foundry.":"O mestre vincula o item de resultado antes de aprovar a fabricação."}</p></details></article>`).join("");
+    const list=rows.map(r=>`<article class="selos-recipe" data-recipe="${e(r.id)}" data-search="${e(normalize(`${r.name} ${r.originalName}`))}" data-rarity="${r.rarity}"><div class="selos-recipe-heading"><div><h2>${e(r.name)}</h2><span class="selos-rarity ${r.rarity}">${e(RARITIES[r.rarity]??"Variável")}</span><span>${e(r.category)}</span></div><div class="selos-row-actions">${this.view==="catalogue"?button("grant",known.has(r.id)?"Já conhecida":"Ensinar","fa-graduation-cap",`data-id="${r.id}" ${!actor || known.has(r.id)?"disabled":""}`)+button("link","Vincular resultado","fa-link",`data-id="${r.id}"`):button("craft","Fabricar","fa-hammer",`data-id="${r.id}"`)}</div></div><details><summary>Componentes e requisitos (${recipeSlots(r).length})</summary><p>Oficina: <strong>${e(RARITIES[r.workshop]??"Mesma raridade do item")}</strong></p><ul>${r.requirements.map(q=>`<li><strong>${CATEGORIES[q.category]}:</strong> ${e(q.label)}</li>`).join("")}</ul>${r.other?`<p>${e(r.other)}</p>`:""}${r.attunement?`<p>${e(r.attunement)}</p>`:""}<p class="selos-note">${Object.values(r.bindings??{}).some(rows=>rows.length)?"Resultado vinculado a um item do Foundry.":"O mestre vincula o item de resultado antes de aprovar a fabricação."}</p></details></article>`).join("");
     return top+nav+search+rest+(!actor && this.view==="book"?`<p class="selos-empty">Abra a ficha de um personagem que você controla ou selecione um personagem.</p>`:`<section class="selos-list">${list || `<p class="selos-empty">${this.view==="book"?"Este personagem ainda não aprendeu receitas. Estude componentes em um descanso longo ou peça ao mestre para ensinar uma receita.":"Nenhuma receita cadastrada."}</p>`}</section><p class="selos-no-results" hidden>Nenhuma receita corresponde à pesquisa.</p>`);
   }
   _replaceHTML(result,content){content.innerHTML=result;}
@@ -139,23 +141,17 @@ async function openManualHarvest(actor){
   if(!form)return;const data=new FormData(form);
   return openHarvest({name:String(data.get("name")),cr:data.get("cr"),type:data.get("type"),portrait:data.get("portrait"),parts:[]},actor);
 }
-async function linkRecipe(recipe){
-  if(!game.user.isGM)throw new Error("Somente o mestre pode vincular o resultado.");
-  const form=await formDialog(`Resultado — ${recipe.name}`,`<p>Use o UUID de um item físico. No Foundry, abra o item e use a opção de copiar UUID no cabeçalho. Armas, atividades, efeitos e propriedades desse item serão preservados.</p>${field("UUID do item de resultado",`<input name="uuid" value="${e(recipe.resultUuid??"")}" required placeholder="Item.… ou Compendium.…">`)}`);
-  if(!form)return;const uuid=String(new FormData(form).get("uuid")).trim();
-  const item=await fromUuid(uuid);if(item?.documentName!=="Item")throw new Error("O UUID não corresponde a um item acessível.");
-  await game.settings.set(ID,"recipeResults",{...game.settings.get(ID,"recipeResults"),[recipe.id]:{resultUuid:uuid}});
-}
+async function linkRecipe(recipe){return openRecipeBinding(recipe.id);}
 export async function openReview(id){
   if(!isAuthority())throw new Error("Abra este pedido na sessão do mestre ativo.");
   const request=requests().find(r=>r.id===id);if(!request)throw new Error("Pedido não registrado. Atualize os pedidos do chat.");
   if(request.status!=="pending")return ui.notifications.info("Este pedido já foi processado. Consulte a lista de pedidos.");
   const actor=await fromUuid(request.actorUuid),recipe=getRecipe(request.recipeId);
   if(!actor||!recipe)throw new Error("Personagem ou receita indisponível.");
-  const slots=recipeSlots(recipe);
+  const slots=recipeSlots(recipe),result=selectedResult(recipe,request.rarity,request.resultUuid);
   let invalid="";try{validateCombination(recipe,components(actor),request.assignments,request.rarity);}catch(error){invalid=error.message;}
-  const content=`<div class="selos-form"><h3>${e(actor.name)} — ${e(recipe.name)}</h3><p>Raridade: ${e(RARITIES[request.rarity])}. Oficina informada: ${e(RARITIES[request.workshop])}.</p><ol>${slots.map((s,i)=>`<li>${e(s.label)}<br><strong>${e(actor.items.get(request.assignments[i])?.name??"Componente removido")}</strong></li>`).join("")}</ol><p>${e(request.notes)}</p>${invalid?`<p class="selos-error">${e(invalid)}</p>`:""}${field("UUID do item de resultado",`<input name="uuid" value="${e(recipe.resultUuid??"")}" placeholder="Item.… ou Compendium.…">`)}<label><input type="checkbox" name="workshop"> Confirmo a disponibilidade e a raridade da oficina.</label><label><input type="checkbox" name="special"> Conferi os requisitos especiais da criatura (dano, imunidade ou características), quando existirem.</label><p>Ao aprovar, os componentes serão consumidos e uma cópia do item vinculado será adicionada ao inventário.</p></div>`;
-  const decision=await DialogV2.wait({window:{title:"Aprovar fabricação"},position:{width:650},content,buttons:[{action:"approve",label:"Aprovar e fabricar",callback:(_event,_button,dialog)=>({approve:true,resultUuid:dialog.element.querySelector('[name="uuid"]').value.trim(),workshopConfirmed:dialog.element.querySelector('[name="workshop"]').checked,conditionsConfirmed:dialog.element.querySelector('[name="special"]').checked})},{action:"reject",label:"Recusar",callback:()=>({approve:false})},{action:"cancel",label:"Voltar",callback:()=>false}],rejectClose:false});
+  const content=`<div class="selos-form"><h3>${e(actor.name)} — ${e(recipe.name)}</h3><p>Raridade: ${e(RARITIES[request.rarity])}. Oficina informada: ${e(RARITIES[request.workshop])}.</p><ol>${slots.map((s,i)=>`<li>${e(s.label)}<br><strong>${e(actor.items.get(request.assignments[i])?.name??"Componente removido")}</strong></li>`).join("")}</ol><p>${e(request.notes)}</p>${invalid?`<p class="selos-error">${e(invalid)}</p>`:""}<p>Resultado: <strong>${e(result?.name??"Vínculo indisponível")}</strong></p><label><input type="checkbox" name="workshop"> Confirmo a disponibilidade e a raridade da oficina.</label><label><input type="checkbox" name="special"> Conferi os requisitos especiais da criatura (dano, imunidade ou características), quando existirem.</label><p>Ao aprovar, os componentes serão consumidos e uma cópia do item vinculado será adicionada ao inventário.</p></div>`;
+  const decision=await DialogV2.wait({window:{title:"Aprovar fabricação"},position:{width:650},content,buttons:[{action:"approve",label:"Aprovar e fabricar",callback:(_event,_button,dialog)=>({approve:true,workshopConfirmed:dialog.element.querySelector('[name="workshop"]').checked,conditionsConfirmed:dialog.element.querySelector('[name="special"]').checked})},{action:"reject",label:"Recusar",callback:()=>({approve:false})},{action:"cancel",label:"Voltar",callback:()=>false}],rejectClose:false});
   if(!decision)return;
   await resolveRequest(id,decision);refreshBook();
 }
@@ -175,6 +171,7 @@ async function newRecipe(){
   const recipe={id:`custom-${foundry.utils.randomID()}`,name:String(data.get("name")).trim(),originalName:String(data.get("originalName")??"").trim(),category:"Receita personalizada",rarity,workshop:rarity,requirements,other:data.get("distinct")?"Cada componente deve vir de uma criatura diferente":"",resultUuid:String(data.get("uuid")).trim()};
   if(!recipe.name)throw new Error("Informe o nome da receita.");
   await game.settings.set(ID,"customRecipes",[...game.settings.get(ID,"customRecipes"),recipe]);
+  if(recipe.resultUuid)await linkRecipeItem(recipe.id,recipe.resultUuid,recipe.rarity);
 }
 async function configureImages(){
   if(!game.user.isGM)throw new Error("Somente o mestre pode configurar imagens.");
