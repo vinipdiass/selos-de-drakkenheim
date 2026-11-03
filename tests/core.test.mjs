@@ -12,7 +12,7 @@ test("ND: faixas completas, frações, limites e valores não definidos",()=>{
   for(const [cr,expected]of [[null,null],["",null],[0,null],["1/8",null],["1/4","common"],[.5,"common"],[1,"uncommon"],[4,"uncommon"],[5,"rare"],[10,"rare"],[11,"veryRare"],[16,"veryRare"],[17,"legendary"],[30,"legendary"],["erro",null]])assert.equal(rarityFromCR(cr),expected,`${cr}`);
 });
 test("estudo usa pontuação ou modificador de Inteligência e nunca limite negativo",()=>{
-  const actor={system:{abilities:{int:{value:16,mod:3}}}};assert.equal(studyLimit(actor),16);assert.equal(studyLimit(actor,"modifier"),3);actor.system.abilities.int.mod=-1;assert.equal(studyLimit(actor,"modifier"),0);
+  const actor={system:{abilities:{int:{value:16,mod:3}}}};assert.equal(studyLimit(actor),3);assert.equal(studyLimit(actor,"score"),16);assert.equal(studyLimit(actor,"modifier"),3);actor.system.abilities.int.mod=-1;assert.equal(studyLimit(actor),0);
 });
 test("componente respeita formato, idioma, metadados, peso e retrato",()=>{
   const result=componentData({monster:{name:"Ratling",type:"monstrosity"},part:{category:"natural",part:"Claws",name:"Garras"},rarity:"common",portrait:"actors/ratling.webp",origin:"ratling-1"});

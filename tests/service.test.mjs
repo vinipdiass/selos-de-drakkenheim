@@ -27,6 +27,7 @@ function reset(){
 globalThis.fetch=async()=>({ok:true,json:async()=>clone(data)});
 const catalog=await import("../selos-de-drakkenheim/scripts/catalog.mjs");await catalog.loadCatalog();
 const service=await import("../selos-de-drakkenheim/scripts/service.mjs");
+const studies=await import("../selos-de-drakkenheim/scripts/study-requests.mjs");
 function request(id="AAAAAAAAAAAAAA01"){return{id,actorUuid:actor.uuid,recipeId:recipe.id,assignments:[...actor.items.keys()],rarity:"common",workshop:"common",notes:"Oficina da praça",submittedAt:1,submittedBy:player.id,status:"pending"};}
 function savePending(value=request()){settings.set("requests",[clone(value)]);return value;}
 const approve=id=>service.resolveRequest(id,{approve:true,resultUuid:"Item.template",workshopConfirmed:true,conditionsConfirmed:true});
@@ -135,4 +136,45 @@ test("receita variável isola raridades e entrega a opção exata selecionada",a
   settings.set('recipeResults',{[variable.id]:{bindings:{common:[{uuid:'Item.template',name:'A'},{uuid:'Item.second',name:'B'}],rare:[{uuid:'Item.second',name:'Raro'}]}}});
   await assert.rejects(service.submitRequest(actor,{...request(),recipeId:variable.id,rarity:'uncommon',resultUuid:'Item.second',workshop:'uncommon'}),/vincular um item/);
   const r=savePending({...request(),recipeId:variable.id,resultUuid:'Item.second'});await service.resolveRequest(r.id,{approve:true,workshopConfirmed:true,conditionsConfirmed:true});assert.equal(actor.items.find(item=>item.getFlag(ID,'kind')==='crafted').name,'Resultado alternativo');assert.equal(actor.items.find(item=>item.getFlag(ID,'kind')==='crafted').system.activities.heal.formula,'8d4');
+});
+
+async function pendingStudy(ids=["input-0"]){
+  current=player;const request=await studies.submitStudyRequest(actor,ids);const data=chatMessages.at(-1),message={...data,id:`chat-${request.id}`,author:player,timestamp:42,getFlag(scope,key){return this.flags[scope]?.[key]}};current=gm;await studies.ingestStudyMessage(message);return {request,message};
+}
+test("estudo fora do descanso aguarda aprovação sem aprender, consumir materiais ou alterar análises",async()=>{
+  reset();delete actor.flags[ID].study;actor.flags[ID].recipes=data.recipes.filter(r=>r.id!==recipe.id).map(r=>({id:r.id}));const {request}=await pendingStudy();assert.equal(studies.studyRequests()[0].status,"pending");assert.ok(!knownRecipe(recipe.id));assert.equal(actor.flags[ID].study,undefined);assert.equal(actor.items.get("input-0").system.quantity,2);assert.deepEqual(chatMessages[0].whisper,[player.id,gm.id]);assert.equal(chatMessages[0].flags[ID].studyRequest.itemIds[0],"input-0");assert.equal(chatMessages[0].flags[ID].studyRequest.recipeId,undefined);assert.ok(request.id);
+});
+const knownRecipe=id=>actor.getFlag(ID,"recipes").some(row=>row.id===id);
+test("aceitar estudo manual aprende receita inédita compatível, anuncia dois idiomas e preserva descanso",async()=>{
+  reset();await service.startRest(actor,"rest-manual");const allowance=actor.getFlag(ID,"study");actor.flags[ID].recipes=data.recipes.filter(r=>r.id!==recipe.id).map(r=>({id:r.id}));const {request}=await pendingStudy();await studies.resolveStudyRequest(request.id,{approve:true});assert.ok(knownRecipe(recipe.id));assert.deepEqual(actor.getFlag(ID,"study"),allowance);assert.equal(actor.items.get("input-0").system.quantity,2);assert.equal(studies.studyRequests()[0].status,"completed");assert.equal(chatMessages.at(-1).flags[ID].kind,"recipe-discovery");assert.match(chatMessages.at(-1).content,/Potion of Healing/);assert.match(chatMessages.at(-1).content,/Poção de Cura/);assert.deepEqual(chatMessages.at(-1).whisper,[]);
+});
+test("jogador e mestre secundário não podem aprovar estudo manual",async()=>{
+  reset();const {request}=await pendingStudy();for(const user of [player,{id:"other-gm",isGM:true,active:true}]){current=user;await assert.rejects(studies.resolveStudyRequest(request.id,{approve:true}),/mestre ativo/);}assert.equal(studies.studyRequests()[0].status,"pending");
+});
+test("recusar estudo mantém receitas, componentes e análises",async()=>{
+  reset();await service.startRest(actor,"rest-reject");const before=clone(actor.flags),items=[...actor.items.values()].map(item=>item.toObject());const {request}=await pendingStudy();await studies.resolveStudyRequest(request.id,{approve:false});assert.deepEqual(actor.flags,before);assert.deepEqual([...actor.items.values()].map(item=>item.toObject()),items);assert.equal(studies.studyRequests()[0].status,"rejected");assert.equal(chatMessages.filter(row=>row.flags?.[ID]?.kind==="recipe-discovery").length,0);
+});
+test("aprovação simultânea do estudo não repete descoberta nem anúncio",async()=>{
+  reset();const {request}=await pendingStudy();const before=actor.getFlag(ID,"recipes").length;const results=await Promise.allSettled([studies.resolveStudyRequest(request.id,{approve:true}),studies.resolveStudyRequest(request.id,{approve:true})]);assert.equal(results.filter(row=>row.status==="fulfilled").length,1);assert.equal(actor.getFlag(ID,"recipes").length,before+1);assert.equal(chatMessages.filter(row=>row.flags?.[ID]?.kind==="recipe-discovery").length,1);
+});
+test("aprovação confere novamente material e posse do personagem",async()=>{
+  reset();let {request}=await pendingStudy();actor.items.delete("input-0");await assert.rejects(studies.resolveStudyRequest(request.id,{approve:true}),/removido/);assert.equal(studies.studyRequests()[0].status,"pending");reset();({request}=await pendingStudy());actor.testUserPermission=user=>user?.isGM;await assert.rejects(studies.resolveStudyRequest(request.id,{approve:true}),/não controla/);
+});
+test("pedido aceita somente componentes atuais e sem escolha de receita",async()=>{
+  reset();current=player;for(const ids of [[],["input-0","input-0"],[{itemId:"input-0",recipeId:recipe.id}],["missing"]])await assert.rejects(studies.submitStudyRequest(actor,ids));actor.flags[ID].recipes=data.recipes.map(row=>({id:row.id}));await assert.rejects(studies.submitStudyRequest(actor,["input-0"]),/inédita/);assert.equal(chatMessages.length,0);
+});
+test("ingestão do estudo usa o autor autenticado e ignora identidade e resultado forjados",async()=>{
+  reset();const {request,message}=await pendingStudy();settings.set("studyRequests",[]);await studies.ingestStudyMessage({...message,author:{id:"stranger",isGM:false}});assert.equal(studies.studyRequests().length,0);message.flags[ID].studyRequest={...request,submittedBy:gm.id,status:"completed",result:{learned:[{id:recipe.id}]}};await studies.ingestStudyMessage(message);assert.equal(studies.studyRequests()[0].submittedBy,player.id);assert.equal(studies.studyRequests()[0].status,"pending");assert.equal(studies.studyRequests()[0].result,undefined);await studies.ingestStudyMessage(message);assert.equal(studies.studyRequests().length,1);
+});
+test("estudo não repete receitas aprendidas enquanto o pedido aguardava",async()=>{
+  reset();actor.flags[ID].recipes=data.recipes.filter(row=>row.id!==recipe.id).map(row=>({id:row.id}));const {request}=await pendingStudy();await service.grantRecipe(actor,recipe.id);await studies.resolveStudyRequest(request.id,{approve:true});assert.deepEqual(studies.studyRequests()[0].result.learned,[]);assert.equal(studies.studyRequests()[0].result.unavailable[0].itemId,"input-0");assert.equal(actor.getFlag(ID,"recipes").length,data.recipes.length);
+});
+test("falha ao gravar a descoberta deixa o pedido pendente sem anúncio",async()=>{
+  reset();const {request}=await pendingStudy();const before=actor.getFlag(ID,"recipes");actor.update=async()=>{throw new Error("Falha de gravação")};await assert.rejects(studies.resolveStudyRequest(request.id,{approve:true}),/Falha de gravação/);assert.deepEqual(actor.getFlag(ID,"recipes"),before);assert.equal(studies.studyRequests()[0].status,"pending");assert.equal(chatMessages.length,1);
+});
+test("recuperação após falha no registro do pedido usa o recibo sem sortear novamente",async()=>{
+  reset();const {request,message}=await pendingStudy();const save=game.settings.set;let once=true;game.settings.set=async(scope,key,value)=>{if(key==="studyRequests"&&value.some(row=>row.status==="completed")&&once){once=false;throw new Error("Registro indisponível")}return save(scope,key,value)};await assert.rejects(studies.resolveStudyRequest(request.id,{approve:true}),/Registro indisponível/);const before=actor.getFlag(ID,"recipes");assert.equal(studies.studyRequests()[0].status,"pending");game.messages.contents=[message];await studies.rescanStudyRequests();assert.equal(studies.studyRequests()[0].status,"completed");assert.deepEqual(actor.getFlag(ID,"recipes"),before);assert.equal(chatMessages.filter(row=>row.flags?.[ID]?.kind==="recipe-discovery").length,1);
+});
+test("saldo padrão do descanso usa modificador e zero mínimo, preservando opção explícita de valor",async()=>{
+  reset();settings.set("studyMode",undefined);actor.system.abilities.int={value:16,mod:3};assert.equal((await service.startRest(actor,"default-mod")).limit,3);actor.system.abilities.int.mod=-2;assert.equal((await service.startRest(actor,"negative-mod")).limit,0);settings.set("studyMode","score");assert.equal((await service.startRest(actor,"explicit-score")).limit,16);
 });

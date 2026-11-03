@@ -18,7 +18,9 @@ O pacote requer Foundry V13.347 ou posterior da geração 13 e D&D 5e 5.3.x. Nã
 
 - Coleta por ícones ao clicar com o botão direito em um inimigo com 0 PV.
 - Coleta exige um Container chamado **Monster Harvesting Tools** e guarda os componentes dentro dele.
-- Estudo no descanso longo descobre receitas aleatórias compatíveis ainda desconhecidas.
+- Estudo no descanso longo descobre receitas aleatórias compatíveis ainda desconhecidas; o limite padrão usa o modificador de Inteligência.
+- **Estudar** permanece disponível no grimório e na bancada. Fora do descanso, o jogador envia componentes e o mestre aceita ou recusa antes do sorteio, sem consumir materiais ou análises do descanso.
+- Controles das janelas usam SVGs locais para fechar e alternar controles.
 - Descobertas anunciadas no chat com os nomes dos itens em português e inglês.
 - Grimório, bancada com arrasto de componentes e fabricação com aprovação do mestre.
 - O mestre pode ensinar e remover receitas de um personagem.
@@ -48,4 +50,4 @@ Para gerar o ZIP no Windows:
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/package.ps1
 ```
 
-A versão 1.3.1 passou em 152 testes automatizados e em verificações de interface no navegador com o CSS real do Foundry V13 e APIs simuladas. Foram conferidos a consulta de resultados no grimório e na bancada, múltiplas opções e raridades, descrições de compêndios restritos, ausência de trechos secretos e preservação do inventário durante a consulta, além dos fluxos anteriores de coleta, estudo e fabricação. A validação no navegador não substitui uma sessão de testes dentro de um mundo real, especialmente com fichas ou módulos de terceiros.
+A versão 1.4.0 passou em 164 testes automatizados e em verificações de interface no navegador com o CSS real do Foundry V13 e APIs simuladas. Foram conferidos pedidos de estudo pendentes, aprovados e recusados, sorteios sem repetição, recuperação após falhas, preservação do saldo do descanso, acesso com inventário vazio ou sem receitas compatíveis, modificador de Inteligência como padrão e controles SVG. Os fluxos anteriores de coleta, fabricação e consulta de itens também foram preservados. A validação no navegador não substitui uma sessão de testes dentro de um mundo real, especialmente com fichas ou módulos de terceiros.

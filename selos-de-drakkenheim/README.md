@@ -14,7 +14,7 @@ Depois, abra o mundo D&D 5e e ative **Selos de Drakkenheim** em **Gerenciar mód
 
 ## Instalação manual
 
-1. Extraia `selos-de-drakkenheim-v1.3.1.zip` dentro da pasta `Data/modules` do seu Foundry.
+1. Extraia `selos-de-drakkenheim-v1.4.0.zip` dentro da pasta `Data/modules` do seu Foundry.
 2. Confirme que o arquivo está em `Data/modules/selos-de-drakkenheim/module.json`, sem uma pasta duplicada no caminho.
 3. Reinicie o Foundry, abra seu mundo D&D 5e e ative **Selos de Drakkenheim** em **Gerenciar módulos**.
 
@@ -68,11 +68,15 @@ O sorteio filtra a categoria, a parte, a raridade e as restrições de criatura 
 
 Receitas já conhecidas são removidas antes do sorteio. Uma receita aparece apenas uma vez no conjunto, mesmo quando aceita o material em mais de um requisito. Ao estudar vários componentes, o módulo não repete receitas na mesma análise e organiza os resultados para aproveitar o maior número possível de descobertas compatíveis. Quando não resta nenhuma receita inédita compatível, não há descoberta nem gasto de análise para esse componente.
 
-O estudo não consome materiais. O limite e as análises já realizadas ficam salvos no personagem, permitindo retomar uma seleção fechada pelo botão **Analisar componentes** no livro. Fechar a janela de resultados não desfaz a descoberta nem permite sortear novamente o mesmo componente naquele descanso.
+O estudo não consome materiais. O limite e as análises já realizadas ficam salvos no personagem. O botão **Retomar descanso** no grimório permite usar as análises restantes de uma seleção fechada. Fechar a janela de resultados não desfaz a descoberta nem permite sortear novamente o mesmo componente naquele descanso.
 
-O padrão usa a **pontuação de Inteligência**, seguindo o pedido. Em **Configurações do módulo**, o mestre pode mudar para o **modificador de Inteligência**, com mínimo zero, ou desativar a pergunta automática.
+O padrão usa o **modificador de Inteligência**, com mínimo zero, para definir as análises por descanso longo. Por exemplo, Inteligência 16 fornece 3 análises. Em **Configurações do módulo**, o mestre ainda pode escolher o valor total de Inteligência ou desativar a pergunta automática. Uma escolha de modo já salva pelo mestre é preservada.
 
 Se o mestre inicia o descanso e há um proprietário jogador conectado, o convite de análise é enviado a esse jogador. Sem jogador conectado, o mestre pode realizar a análise. Se vários jogadores controlam o mesmo personagem, o convite automático vai para um deles.
+
+**Estudar fora do descanso longo:** o botão **Estudar** está sempre disponível no grimório e na bancada, mesmo sem descanso registrado, sem análises restantes ou sem materiais que possam revelar receitas. A tela mostra os materiais disponíveis primeiro e explica quando não há nada para analisar. Selecione componentes e clique em **Solicitar estudo**. O pedido aparece no chat privado do jogador e dos mestres e na aba **Pedidos**, em **Pedidos de estudo**.
+
+O mestre ativo abre **Revisar estudo** e escolhe **Aceitar** ou **Recusar**. A receita só é sorteada depois de aceitar, com nova conferência dos materiais, do controle do personagem e das receitas conhecidas. Cada material pode revelar uma receita inédita compatível, conforme as mesmas regras do descanso; o jogador nunca escolhe a receita. Esse estudo não consome materiais nem o saldo de análises do descanso longo. O resultado aparece na janela do jogador e as descobertas são anunciadas no chat em português e inglês. A recusa preserva o personagem. Pedidos pendentes podem ser revisados quando o mestre se conectar, e uma aprovação interrompida não sorteia novamente receitas já salvas.
 
 **Para vincular resultados e alterar o ícone de uma receita:** entre como mestre e clique no ícone da receita no grimório de qualquer personagem, ou use **Vincular resultado** no catálogo. Arraste um item físico do mundo, compêndio ou inventário para a área de vínculo; também é possível colar seu UUID. O ícone passa a ser o do item vinculado para todos os personagens. A edição independente de imagem foi substituída por esse vínculo.
 
@@ -138,6 +142,8 @@ Os arquivos de imagem externos não são incluídos no ZIP. As artes de The Witc
 Esses dados acompanham a cópia de segurança normal do mundo. O módulo não modifica a planilha original.
 
 ## Validação desta versão
+
+Os botões nativos de fechar janela e alternar controles usam ícones SVG locais: X e ajustes, preservando as ações e os rótulos acessíveis do Foundry. Eles não dependem da fonte de ícones.
 
 A abertura do grimório, bancada, estudo e coleta aguarda a criação assíncrona da janela antes de trazê-la para frente. Cliques rápidos reutilizam a janela em abertura. Testes de regressão cobrem o erro `Cannot read properties of undefined (reading 'style')`, foco após fechar uma janela e atualizações do inventário sem mudar o foco.
 

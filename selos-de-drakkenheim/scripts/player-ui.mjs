@@ -1,6 +1,7 @@
 import {ID,RARITIES,CATEGORIES,TYPES,escapeHTML as e,safeImage,normalize,recipeSlots,studyCandidates,workshopMeets,harvestTools,HARVEST_TOOLS_NAME,HARVEST_TOOLS_REQUIRED} from "./core.mjs";
 import {catalog,recipes,getRecipe,components,knownRecipes,accessibleActors,owns,componentPreview} from "./catalog.mjs";
-import {studyComponents,submitRequest,requests,serialize,revokeRecipe} from "./service.mjs";
+import {studyComponents,submitRequest,requests,serialize,revokeRecipe,isAuthority} from "./service.mjs";
+import {submitStudyRequest,studyRequests,resolveStudyRequest} from "./study-requests.mjs";
 import {harvestDestination,harvestProfile,isDefeatedEnemy,partKey,requestTokenHarvest} from "./harvest.mjs";
 import {CraftingPlan,resolveInventoryDrop} from "./crafting.mjs";
 import {allResults,resultChoices,selectedResult} from "./bindings.mjs";
@@ -75,7 +76,7 @@ export class GamePanel extends ApplicationV2{
   feedback(text){this.notice=text;const live=this.element?.querySelector(".sd-feedback");if(live){live.textContent=text;live.hidden=!text;}else ui.notifications.warn(text);}
   feedbackHTML(){return `<p class="sd-feedback" aria-live="polite" ${this.notice?"":"hidden"}>${e(this.notice)}</p>`;}
   onInput(){}onChange(){}
-  async onAction(action,target){if(action==="close")return this.close();if(action==="view-result")return openResultPreview(target.dataset.recipeId,target.dataset.rarity,target.dataset.resultUuid);if(action==="sheet")return this.actor?.sheet?.render({force:true});if(action==="book"){const panel=openPlayerBook(this.actor);if(this.kind!=="book")await this.close();return panel;}}
+  async onAction(action,target){if(action==="close")return this.close();if(action==="study")return openPlayerStudy(this.actor);if(action==="resume-study")return openPlayerStudy(this.actor,{restId:this.actor.getFlag(ID,"study")?.restId});if(action==="review-study")return openStudyReview(target.dataset.requestId);if(action==="view-result")return openResultPreview(target.dataset.recipeId,target.dataset.rarity,target.dataset.resultUuid);if(action==="sheet")return this.actor?.sheet?.render({force:true});if(action==="book"){const panel=openPlayerBook(this.actor);if(this.kind!=="book")await this.close();return panel;}}
 }
 
 class ResultPreviewPanel extends GamePanel{
@@ -147,14 +148,14 @@ class PlayerBook extends GamePanel{
     const choices=accessibleActors();if(!choices.some(a=>a.uuid===actor.uuid))choices.push(actor);
     const select=choices.length>1?`<select name="playerActor" aria-label="Personagem">${choices.map(a=>`<option value="${e(a.uuid)}" ${actor.uuid===a.uuid?"selected":""}>${e(a.name)}</option>`).join("")}</select>`:"";
     const header=heroHeader({eyebrow:"Selos de Drakkenheim",title:"Grimório do caçador",subtitle:actor.name,portrait:actor.img,side:`${select}<span class="sd-stat"><strong>${known.length}</strong> receitas conhecidas</span>`});
-    const tabs=`<nav class="sd-tabs" aria-label="Grimório">${action("recipes","Receitas","fa-book-open",`aria-pressed="${this.tab==="recipes"}"`)}${action("materials","Materiais","fa-sack-xmark",`aria-pressed="${this.tab==="materials"}"`)}${action("study",`Estudar${remaining?` · ${remaining}`:""}`,"fa-moon",`${remaining?"":"disabled"} title="${study?"Analisar os materiais deste descanso":"Conclua um descanso longo para estudar"}"`)}${game.user.isGM?action("gm-catalogue","Catálogo do mestre","fa-scroll")+action("gm-requests","Pedidos","fa-hourglass-half"):""}${action("sheet","Abrir ficha","fa-user")}</nav>`;
+    const tabs=`<nav class="sd-tabs" aria-label="Grimório">${action("recipes","Receitas","fa-book-open",`aria-pressed="${this.tab==="recipes"}"`)}${action("materials","Materiais","fa-sack-xmark",`aria-pressed="${this.tab==="materials"}"`)}${action("study","Estudar","fa-book-open",`title="Estudar componentes com aprovação do mestre"`)}${game.user.isGM?action("gm-catalogue","Catálogo do mestre","fa-scroll")+action("gm-requests","Pedidos","fa-hourglass-half"):""}${action("sheet","Abrir ficha","fa-user")}</nav>`;
     const cards=recipes().filter(recipe=>known.some(entry=>entry.id===recipe.id));
     const bank=items.length?`<div class="sd-material-grid">${items.map(item=>materialTile(item,{actionName:"inspect",draggable:true})).join("")}</div>`:emptyState("fa-paw","Sua bolsa está vazia","Procure componentes em criaturas derrotadas. Clique com o botão direito no token de um inimigo com 0 PV.");
     const list=cards.length?`<div class="sd-recipe-grid">${cards.map(recipe=>{
       const total=recipeSlots(recipe).length,pending=requests().find(request=>request.actorUuid===actor.uuid&&request.recipeId===recipe.id&&["pending","processing","recovery"].includes(request.status));
       return `<article class="sd-recipe-card" data-search="${e(normalize(`${recipe.name} ${recipe.originalName}`))}" data-rarity="${recipe.rarity}" style="--rarity:${colors[recipe.rarity]??colors.veryRare}">${recipeCrest(recipe)}${rarityBadge(recipe.rarity)}<h2>${e(recipe.name)}</h2><p>${e(recipe.category)} <span>· ${total} componentes</span></p><details><summary>Ver receita</summary><ul>${recipe.requirements.map(requirement=>`<li>${e(requirement.label)}</li>`).join("")}</ul>${recipe.attunement?`<p>${e(recipe.attunement)}</p>`:""}${recipe.other?`<p>${e(recipe.other)}</p>`:""}</details>${allResults(recipe).length?action("view-result","Ver item","fa-eye",`data-recipe-id="${e(recipe.id)}"`):""}${action("forge",pending?"Ver pedido":"Abrir bancada",pending?"fa-hourglass-half":"fa-hammer",`data-recipe-id="${recipe.id}" ${!pending&&!allResults(recipe).length?'disabled title="O mestre precisa vincular um item a esta receita"':""}`)}${!allResults(recipe).length?'<p class="sd-binding-missing">Aguardando vínculo do mestre</p>':""}${game.user.isGM?action("remove-recipe","Remover receita","fa-trash-can",`class="sd-forget-recipe" data-recipe-id="${e(recipe.id)}" aria-label="${e(`Remover ${recipe.name} do grimório de ${actor.name}`)}"`):""}</article>`;
     }).join("")}</div><p class="sd-no-results" hidden>Nenhuma receita corresponde à pesquisa.</p>`:emptyState("fa-book-open","Todo grimório começa em branco","Estude os componentes durante um descanso longo para descobrir receitas. O mestre também pode ensinar uma receita ao personagem.");
-    return `${header}${tabs}<div class="sd-book-layout"><main class="sd-main"><div class="sd-section-heading"><div><span class="sd-eyebrow">${this.tab==="recipes"?"Conhecimento conquistado":"Coletas da jornada"}</span><h2>${this.tab==="recipes"?"Suas receitas":"Seus componentes"}</h2></div><span class="sd-count">${this.tab==="recipes"?cards.length:items.length}</span></div>${this.tab==="recipes"?`<div class="sd-search"><input type="search" name="recipeSearch" value="${e(this.query)}" placeholder="Buscar no grimório…" aria-label="Buscar receita"><select name="recipeRarity" aria-label="Raridade da receita"><option value="">Todas as raridades</option>${Object.entries({...RARITIES,varies:"Variável"}).map(([key,label])=>`<option value="${key}" ${key===this.rarity?"selected":""}>${label}</option>`).join("")}</select></div>${list}`:bank}${this.feedbackHTML()}</main><aside class="sd-book-aside"><div class="sd-rest-card">${icon("fa-moon")}<span class="sd-eyebrow">Estudo no descanso</span><strong>${study?`${remaining} análise(s) disponível(is)`:"Descanse para descobrir"}</strong><p>Escolha o material. A descoberta será uma receita inédita, sorteada entre as compatíveis.</p>${action("study","Analisar componentes","fa-magnifying-glass",remaining?"":"disabled")}</div><div class="sd-aside-heading"><h3>Bolsa de componentes</h3><span>${items.length}</span></div><p class="sd-muted">Arraste estes materiais para a bancada de uma receita.</p><div class="sd-bag-grid">${items.map(item=>materialTile(item,{actionName:"inspect",draggable:true})).join("")||'<p class="sd-muted">Nenhum componente coletado.</p>'}</div></aside></div>`;
+    return `${header}${tabs}<div class="sd-book-layout"><main class="sd-main"><div class="sd-section-heading"><div><span class="sd-eyebrow">${this.tab==="recipes"?"Conhecimento conquistado":"Coletas da jornada"}</span><h2>${this.tab==="recipes"?"Suas receitas":"Seus componentes"}</h2></div><span class="sd-count">${this.tab==="recipes"?cards.length:items.length}</span></div>${this.tab==="recipes"?`<div class="sd-search"><input type="search" name="recipeSearch" value="${e(this.query)}" placeholder="Buscar no grimório…" aria-label="Buscar receita"><select name="recipeRarity" aria-label="Raridade da receita"><option value="">Todas as raridades</option>${Object.entries({...RARITIES,varies:"Variável"}).map(([key,label])=>`<option value="${key}" ${key===this.rarity?"selected":""}>${label}</option>`).join("")}</select></div>${list}`:bank}${this.feedbackHTML()}</main><aside class="sd-book-aside"><div class="sd-rest-card">${icon("fa-moon")}<span class="sd-eyebrow">Estudo de componentes</span><strong>${remaining?`${remaining} análise(s) do descanso`:"Novas descobertas"}</strong><p>Estude a qualquer momento com aprovação do mestre. As análises do descanso longo continuam automáticas.</p>${action("study","Estudar componentes","fa-magnifying-glass")}${remaining?action("resume-study","Retomar descanso","fa-moon"):""}</div><div class="sd-aside-heading"><h3>Bolsa de componentes</h3><span>${items.length}</span></div><p class="sd-muted">Arraste estes materiais para a bancada de uma receita.</p><div class="sd-bag-grid">${items.map(item=>materialTile(item,{actionName:"inspect",draggable:true})).join("")||'<p class="sd-muted">Nenhum componente coletado.</p>'}</div></aside></div>`;
   }
   async _onRender(context,options){await super._onRender(context,options);this.filter();}
   filter(){let visible=0;this.element.querySelectorAll(".sd-recipe-card").forEach(card=>{card.hidden=!card.dataset.search.includes(normalize(this.query))||!!this.rarity&&card.dataset.rarity!==this.rarity;if(!card.hidden)visible++;});const empty=this.element.querySelector(".sd-no-results");if(empty)empty.hidden=visible>0;}
@@ -217,7 +218,7 @@ class ForgePanel extends GamePanel{
     const {plan}=this,recipe=getRecipe(this.recipe.id)??this.recipe;plan.setInventory(components(this.actor));
     const choices=resultChoices(recipe,plan.rarity);if(!choices.some(row=>row.uuid===this.resultUuid))this.resultUuid=choices[0]?.uuid??null;
     const result=selectedResult(recipe,plan.rarity,this.resultUuid);
-    const header=heroHeader({eyebrow:"Bancada de fabricação",title:recipe.name,subtitle:`${this.actor.name} · ${recipe.category}`,portrait:result?.img??recipe.img,portraitFallback:"icons/svg/book.svg",glyph:recipeGlyph(recipe),rarity:plan.rarity});
+    const header=heroHeader({eyebrow:"Bancada de fabricação",title:recipe.name,subtitle:`${this.actor.name} · ${recipe.category}`,portrait:result?.img??recipe.img,portraitFallback:"icons/svg/book.svg",glyph:recipeGlyph(recipe),rarity:plan.rarity,side:action("study","Estudar","fa-book-open")});
     if(this.submitted){
       const current=requests().find(request=>request.id===this.submitted.id)??this.submitted,completed=current.status==="completed",rejected=current.status==="rejected";
       return `${header}<main class="sd-main sd-submitted">${emptyState(completed?"fa-gem":rejected?"fa-xmark":"fa-hourglass-half",completed?"Seu item foi forjado":rejected?"Pedido recusado":"Pedido enviado ao mestre",completed?"O item fabricado já está no inventário do personagem.":rejected?"O mestre recusou esta fabricação. Seus componentes foram preservados.":"A bancada está registrada. Seus materiais serão consumidos após a aprovação do mestre.")}${this.feedbackHTML()}<div class="sd-center-actions">${action("sheet","Ver inventário","fa-sack-xmark")}${action("book","Voltar ao grimório","fa-book-open")}${action("close","Fechar")}</div></main>`;
@@ -262,34 +263,64 @@ class ForgePanel extends GamePanel{
   }
 }
 
+class StudyReviewPanel extends GamePanel{
+  static DEFAULT_OPTIONS={window:{title:"Revisar estudo"},position:{width:660,height:610}};
+  constructor(id){super();this.kind="study-review";this.requestId=id;this.busy=false;}
+  async _renderHTML(){
+    const request=studyRequests().find(row=>row.id===this.requestId),actor=request?await fromUuid(request.actorUuid):null;
+    if(!request)return `<main class="sd-main">${emptyState("fa-book-open","Pedido indisponível","Atualize os pedidos do mestre.")}</main>`;
+    const pending=request.status==="pending",completed=request.status==="completed",inventory=actor?components(actor):[];
+    return `${heroHeader({eyebrow:"Estudo fora do descanso longo",title:actor?.name??"Personagem removido",subtitle:pending?"Aguardando sua decisão":completed?"Estudo aprovado":"Estudo recusado",glyph:"fa-book-open"})}<main class="sd-main"><p class="sd-muted">Ao aceitar, o módulo sorteia receitas inéditas compatíveis com os componentes atuais. O estudo não consome materiais nem análises do descanso.</p><ul class="sd-review-materials">${request.materials.map(row=>`<li>${e(row.name)}${inventory.some(item=>item.id===row.id)?"":" — indisponível"}</li>`).join("")}</ul>${completed?`<p>${request.result?.learned.length??0} receita(s) aprendida(s). As descobertas estão salvas no personagem.</p>`:""}${pending&&!isAuthority()?'<p class="sd-rule">Somente o mestre ativo pode decidir este pedido.</p>':""}${this.feedbackHTML()}</main><footer class="sd-footer">${pending?action("reject-study","Recusar","fa-xmark",this.busy||!isAuthority()?"disabled":"")+action("accept-study",this.busy?"Processando…":"Aceitar","fa-check",`class="sd-primary" ${this.busy||!isAuthority()?"disabled":""}`):action("close","Fechar","fa-check")}</footer>`;
+  }
+  async onAction(name,target){
+    if(this.busy)return;
+    if(name==="accept-study"||name==="reject-study"){
+      this.busy=true;await this.redraw();
+      try{await resolveStudyRequest(this.requestId,{approve:name==="accept-study"});this.notice="";}catch(error){this.notice=errorText(error);}finally{this.busy=false;await this.redraw();}
+      return;
+    }
+    return super.onAction(name,target);
+  }
+}
+export function openStudyReview(id){
+  if(!game.user.isGM)throw new Error("Somente o mestre pode revisar estudos.");
+  if(!studyRequests().some(row=>row.id===id))throw new Error("Pedido de estudo não encontrado. Atualize os pedidos do chat.");
+  let panel=[...panels].find(panel=>panel.kind==="study-review"&&panel.requestId===id&&!panel.closed);
+  if(!panel)panel=new StudyReviewPanel(id);panel.redraw({activate:true});return panel;
+}
 class StudyPanel extends GamePanel{
   static DEFAULT_OPTIONS={window:{title:"Estudo de componentes"},position:{width:820,height:730}};
-  constructor(actor){super();this.kind="study";this.actor=actor;this.restId=actor.getFlag(ID,"study").restId;this.selected=new Set();this.busy=false;}
+  constructor(actor,{restId}={}){super();this.kind="study";this.actor=actor;this.restId=restId??null;this.selected=new Set();this.busy=false;this.submitted=this.restId?null:studyRequests().find(row=>row.actorUuid===actor.uuid&&row.status==="pending");}
+  allowance(){const study=this.actor.getFlag(ID,"study");return this.restId?(study?.restId===this.restId?Math.max(0,study.limit-study.used.length):0):50;}
   async _renderHTML(){
-    const study=this.actor.getFlag(ID,"study"),remaining=study?Math.max(0,study.limit-study.used.length):0,known=knownRecipes(this.actor).map(entry=>entry.id),all=recipes();
-    const available=new Map();
-    const items=components(this.actor).filter(item=>!study?.used.includes(item.id));
+    if(this.submitted){
+      const request=studyRequests().find(row=>row.id===this.submitted.id)??this.submitted,completed=request.status==="completed",rejected=request.status==="rejected";
+      return `${heroHeader({eyebrow:"Estudo fora do descanso longo",title:completed?"Estudo aprovado":rejected?"Estudo recusado":"Pedido enviado ao mestre",subtitle:this.actor.name,glyph:"fa-book-open"})}<main class="sd-main"><p class="sd-muted">${completed?"As receitas sorteadas já estão salvas no personagem.":rejected?"O mestre recusou este estudo. Seus componentes e análises do descanso foram preservados.":"Aguardando o mestre clicar em Aceitar. Nenhuma receita foi aprendida ainda."}</p>${completed?`<ul>${request.result.learned.map(row=>{const recipe=getRecipe(row.id);return `<li><strong>${e(recipe?.name??"Receita indisponível")}</strong>${recipe?.originalName?` <span lang="en">(${e(recipe.originalName)})</span>`:""}</li>`;}).join("")||"<li>Nenhuma receita inédita compatível restante.</li>"}</ul>`:""}${this.feedbackHTML()}</main><footer class="sd-footer">${game.user.isGM&&request.status==="pending"?action("review-study","Revisar estudo","fa-book-open",`data-request-id="${request.id}"`):""}${request.status!=="pending"?action("new-study","Novo estudo","fa-magnifying-glass"):""}${action("close","Fechar","fa-check")}</footer>`;
+    }
+    const study=this.actor.getFlag(ID,"study"),remaining=this.allowance(),known=knownRecipes(this.actor).map(entry=>entry.id),all=recipes(),available=new Map();
+    const items=components(this.actor).filter(item=>!this.restId||!study?.used.includes(item.id));
     for(const item of items)available.set(item.id,studyCandidates(item,all,known).length>0);
     items.sort((a,b)=>Number(available.get(b.id))-Number(available.get(a.id)));
-    this.selected=new Set([...this.selected].filter(id=>items.some(item=>item.id===id&&studyCandidates(item,all,known).length)));
-    return `${heroHeader({eyebrow:"Descanso longo",title:"À luz da descoberta",subtitle:`${this.actor.name} · ${remaining} análise(s) disponível(is)`,glyph:"fa-moon"})}<main class="sd-main"><div class="sd-study-intro"><p>Escolha os componentes que deseja examinar. Cada análise revela uma receita inédita, sorteada entre as compatíveis.</p><span class="sd-selection-count">${this.selected.size}/${remaining} selecionados</span></div><div class="sd-material-grid sd-study-grid">${items.map(item=>{
-      const possible=available.get(item.id);
-      return materialTile(item,{actionName:"toggle-study",selected:this.selected.has(item.id),disabled:!possible||this.busy,subtitle:possible?"Disponível para estudo":"Nenhuma receita inédita compatível"});
-    }).join("")||emptyState("fa-moon","Nenhum material para estudar","Colete novos componentes para fazer descobertas em outro descanso.")}</div>${this.feedbackHTML()}</main><footer class="sd-footer"><span class="sd-muted">O estudo preserva os componentes.</span>${action("study-confirm",this.busy?"Analisando…":"Analisar componentes","fa-wand-sparkles",`class="sd-primary" ${!this.selected.size||this.busy?"disabled":""}`)}</footer>`;
+    this.selected=new Set([...this.selected].filter(id=>items.some(item=>item.id===id&&available.get(id))).slice(0,remaining));
+    const rest=!!this.restId,limit=rest?remaining:Math.min(remaining,items.filter(item=>available.get(item.id)).length);
+    return `${heroHeader({eyebrow:rest?"Descanso longo":"Estudo fora do descanso longo",title:"À luz da descoberta",subtitle:`${this.actor.name} · ${rest?`${remaining} análise(s) disponível(is)`:"Aprovação do mestre"}`,glyph:rest?"fa-moon":"fa-book-open"})}<main class="sd-main"><div class="sd-study-intro"><p>${rest?"Escolha os componentes que deseja examinar. Cada análise revela uma receita inédita, sorteada entre as compatíveis.":"Escolha os componentes e solicite o estudo. A receita será sorteada somente quando o mestre aceitar, sem gastar suas análises do descanso."}</p><span class="sd-selection-count">${this.selected.size}/${limit} selecionados</span></div>${rest&&!remaining?'<p class="sd-rule">Não há análises restantes neste descanso. Você pode solicitar um estudo ao mestre.</p>':""}${items.length&&!items.some(item=>available.get(item.id))?'<p class="sd-rule">Nenhum destes componentes pode revelar uma receita que você ainda não conhece.</p>':""}<div class="sd-material-grid sd-study-grid">${items.map(item=>materialTile(item,{actionName:"toggle-study",selected:this.selected.has(item.id),disabled:!available.get(item.id)||!remaining||this.busy,subtitle:available.get(item.id)?"Disponível para estudo":"Nenhuma receita inédita compatível"})).join("")||emptyState("fa-book-open","Nenhum material para estudar","Colete componentes para descobrir novas receitas.")}</div>${this.feedbackHTML()}</main><footer class="sd-footer"><span class="sd-muted">O estudo preserva os componentes.</span>${rest?action("manual-study","Solicitar estudo ao mestre","fa-book-open"):""}${action("study-confirm",this.busy?"Processando…":rest?"Analisar componentes":"Solicitar estudo",rest?"fa-wand-sparkles":"fa-paper-plane",`class="sd-primary" ${!this.selected.size||this.busy?"disabled":""}`)}</footer>`;
   }
-  async onAction(action,target){
+  async onAction(name,target){
     if(this.busy)return;
-    if(action==="toggle-study"){
-      const id=target.dataset.itemId,study=this.actor.getFlag(ID,"study"),remaining=Math.max(0,study.limit-study.used.length);
-      if(this.selected.has(id))this.selected.delete(id);else if(this.selected.size<remaining)this.selected.add(id);else return this.feedback("Você atingiu o limite de análises deste descanso.");
+    if(name==="manual-study"||name==="new-study"){this.restId=null;this.submitted=null;this.selected.clear();this.notice="";return this.redraw();}
+    if(name==="toggle-study"){
+      const id=target.dataset.itemId;
+      if(this.selected.has(id))this.selected.delete(id);else if(this.selected.size<this.allowance())this.selected.add(id);else return this.feedback("Você atingiu o limite de análises deste estudo.");
       this.notice="";return this.redraw();
     }
-    if(action==="study-confirm"){
+    if(name==="study-confirm"){
       this.busy=true;await this.redraw();
-      try{const result=await serialize(()=>studyComponents(this.actor,[...this.selected],this.restId));await this.close();await refreshPlayerPanels(this.actor);const panel=new DiscoveryPanel(this.actor,result);await panel.redraw();}
-      catch(error){this.busy=false;this.notice=errorText(error);await this.redraw();}return;
+      try{
+        if(!this.restId){this.submitted=await submitStudyRequest(this.actor,[...this.selected]);this.selected.clear();this.busy=false;return this.redraw();}
+        const result=await serialize(()=>studyComponents(this.actor,[...this.selected],this.restId));await this.close();await refreshPlayerPanels(this.actor);const panel=new DiscoveryPanel(this.actor,result);await panel.redraw();
+      }catch(error){this.busy=false;this.notice=errorText(error);await this.redraw();}return;
     }
-    return super.onAction(action,target);
+    return super.onAction(name,target);
   }
 }
 class DiscoveryPanel extends GamePanel{
@@ -318,13 +349,10 @@ export function openForge(actor,recipe){
   let panel=[...panels].find(panel=>panel.kind==="forge"&&panel.actor.uuid===actor.uuid&&panel.recipe.id===recipe.id&&!panel.closed);
   if(!panel)panel=new ForgePanel(actor,recipe);panel.redraw({activate:true});return panel;
 }
-export function openPlayerStudy(actor){
+export function openPlayerStudy(actor,{restId}={}){
   if(!actor||!owns(actor))throw new Error("Selecione um personagem que você controla.");
-  const study=actor.getFlag(ID,"study");
-  if(!study||study.used.length>=study.limit)return ui.notifications.info("Conclua um descanso longo para ter novas análises disponíveis.");
-  const known=knownRecipes(actor).map(entry=>entry.id);
-  if(!components(actor).some(item=>!study.used.includes(item.id)&&studyCandidates(item,recipes(),known).length))return ui.notifications.info("Nenhum componente disponível pode revelar uma receita compatível que você ainda não conhece.");
-  let panel=[...panels].find(panel=>panel.kind==="study"&&panel.actor.uuid===actor.uuid&&!panel.closed);if(!panel)panel=new StudyPanel(actor);panel.redraw({activate:true});return panel;
+  let panel=[...panels].find(panel=>panel.kind==="study"&&panel.actor.uuid===actor.uuid&&panel.restId===(restId??null)&&!panel.closed);
+  if(!panel)panel=new StudyPanel(actor,{restId});panel.redraw({activate:true});return panel;
 }
 export function openLoot(token){
   if(!isDefeatedEnemy(token))throw new Error("A coleta exige um inimigo com exatamente 0 PV.");

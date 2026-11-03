@@ -1,5 +1,15 @@
 # Histórico
 
+## 1.4.0
+
+- Troca os ícones de fechar janela e alternar controles por SVGs locais, preservando suas ações e rótulos acessíveis.
+- Mantém **Estudar** disponível no grimório e na bancada, inclusive sem descanso, análises restantes, componentes ou receitas compatíveis.
+- Adiciona estudo fora do descanso com pedido ao mestre, revisão por **Aceitar** ou **Recusar** e sorteio somente após a aprovação.
+- Revalida o inventário e o conhecimento do personagem ao aprovar, evita receitas repetidas e recupera aprovações interrompidas sem novo sorteio.
+- Preserva componentes e o saldo do descanso nos estudos manuais. O estudo automático do descanso longo continua disponível, com opção de retomada das análises restantes.
+- Usa o modificador de Inteligência, com mínimo zero, como padrão do limite por descanso; mantém a opção de valor total.
+- 164 testes automatizados e fluxos de interface conferidos em duas sessões simuladas.
+
 ## 1.3.1
 
 - Adiciona **Ver item** no grimório e na bancada para consultar a imagem, a descrição formatada e os detalhes públicos do resultado vinculado.

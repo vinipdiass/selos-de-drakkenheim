@@ -67,18 +67,22 @@ export async function studyComponents(actor,itemIds,expectedRestId) {
   if(!additions.length)return {learned:[],unavailable};
   // One document update keeps learned recipes and the rest allowance in sync.
   await actor.update({[`flags.${ID}.recipes`]:[...current,...additions],[`flags.${ID}.study`]:{...study,used:[...study.used,...draws.map(draw=>draw.itemId)]}});
+  const chatError=await announceDiscoveries(actor,additions,{restId:study.restId});
+  return {learned:additions,unavailable,...(chatError?{chatError}:{})};
+}
+export async function announceDiscoveries(actor,additions,context={}) {
+  if(!additions.length)return;
   try{
     const cards=additions.map(entry=>{
       const recipe=getRecipe(entry.id);
       return `<li><strong lang="pt-BR">${escapeHTML(recipe?.name??"Receita indisponível")}</strong><span class="selos-recipe-original" lang="en">${escapeHTML(recipe?.originalName?.trim()||"Nome em inglês não informado")}</span><small>Material estudado: ${escapeHTML(entry.componentName)}</small></li>`;
     }).join("");
-    await ChatMessage.create({content:`<div class="selos-chat selos-discovery-chat"><h3>${additions.length===1?"Receita aprendida":"Receitas aprendidas"}</h3><p><strong>${escapeHTML(actor.name)}</strong> aprendeu ${additions.length===1?"uma nova receita":"novas receitas"} ao estudar componentes.</p><ul>${cards}</ul></div>`,whisper:[],speaker:ChatMessage.getSpeaker({actor}),flags:{[ID]:{kind:"recipe-discovery",actorUuid:actor.uuid,restId:study.restId,recipeIds:additions.map(entry=>entry.id)}}});
+    await ChatMessage.create({content:`<div class="selos-chat selos-discovery-chat"><h3>${additions.length===1?"Receita aprendida":"Receitas aprendidas"}</h3><p><strong>${escapeHTML(actor.name)}</strong> aprendeu ${additions.length===1?"uma nova receita":"novas receitas"} ao estudar componentes.</p><ul>${cards}</ul></div>`,whisper:[],speaker:ChatMessage.getSpeaker({actor}),flags:{[ID]:{kind:"recipe-discovery",actorUuid:actor.uuid,...context,recipeIds:additions.map(entry=>entry.id)}}});
   }catch(error){
     // A chat failure must not undo a saved discovery or let the player reroll it.
     console.error(`${ID} | Não foi possível anunciar a descoberta no chat.`,error);
-    return {learned:additions,unavailable,chatError:"As receitas foram salvas, mas não foi possível publicar a descoberta no chat."};
+    return "As receitas foram salvas, mas não foi possível publicar a descoberta no chat.";
   }
-  return {learned:additions,unavailable};
 }
 export async function submitRequest(actor,{recipeId,assignments,rarity,workshop,notes,resultUuid}) {
   assert(owns(actor),"Você precisa controlar este personagem.");

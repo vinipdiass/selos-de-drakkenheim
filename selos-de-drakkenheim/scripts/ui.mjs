@@ -3,7 +3,8 @@ import {catalog,recipes,getRecipe,components,knownRecipes,accessibleActors,owns,
 import {grantRecipe,requests,resolveRequest,recoverRequest,isAuthority} from "./service.mjs";
 import {linkRecipeItem} from "./result-links.mjs";
 import {selectedResult} from "./bindings.mjs";
-import {openPlayerBook,openPlayerStudy,openForge,refreshPlayerPanels,openRecipeBinding} from "./player-ui.mjs";
+import {openPlayerBook,openPlayerStudy,openForge,refreshPlayerPanels,openRecipeBinding,openStudyReview} from "./player-ui.mjs";
+import {studyRequests,rescanStudyRequests} from "./study-requests.mjs";
 
 const {ApplicationV2,DialogV2}=foundry.applications.api;
 const option=(value,label,selected)=>`<option value="${e(value)}" ${value===selected?"selected":""}>${e(label)}</option>`;
@@ -42,7 +43,7 @@ export class SelosApp extends ApplicationV2 {
     this._selosEvents?.abort();
     this._selosEvents=new AbortController();
     this.element.addEventListener("click",event=>{
-      const target=event.target.closest("[data-action]");if(!target)return;
+      const target=event.target.closest(".window-content [data-action]");if(!target)return;
       event.preventDefault();
       run(async()=>{
         target.disabled=true;
@@ -56,7 +57,7 @@ export class SelosApp extends ApplicationV2 {
     this.element.querySelector('[data-filter="monster"]')?.addEventListener("change",event=>{this.monsterKey=event.target.value;});
     this.filterRecipes();
   }
-  filterRecipes(){let visible=0;this.element.querySelectorAll(".selos-recipe").forEach(row=>{row.hidden=!(row.dataset.search.includes(normalize(this.search)) && (!this.rarity || row.dataset.rarity===this.rarity));if(!row.hidden)visible++;});const message=this.element.querySelector(".selos-no-results");if(message)message.hidden=visible>0;}
+  filterRecipes(){let visible=0;this.element.querySelectorAll(".selos-recipe[data-search]").forEach(row=>{row.hidden=!(row.dataset.search.includes(normalize(this.search)) && (!this.rarity || row.dataset.rarity===this.rarity));if(!row.hidden)visible++;});const message=this.element.querySelector(".selos-no-results");if(message)message.hidden=visible>0;}
   filterMonsters(){const select=this.element.querySelector('[data-filter="monster"]');if(!select)return;const filtered=this.monsters.filter(m=>normalize(m.name).includes(normalize(this.monsterSearch)));const key=filtered.some(m=>m.key===this.monsterKey)?this.monsterKey:filtered[0]?.key;select.innerHTML=filtered.slice(0,300).map(m=>option(m.key,`${m.name} — ${m.source}`,key)).join("");this.monsterKey=select.value;const count=this.element.querySelector(".selos-monster-count");if(count)count.textContent=`${filtered.length} criatura(s) encontrada(s)${filtered.length>300?". Refine a pesquisa para ver as demais.":"."}`;}
   async action(action,id) {
     if(action==="book")return openPlayerBook(this.actor);
@@ -68,10 +69,11 @@ export class SelosApp extends ApplicationV2 {
     if(action==="collect"){const entry=this.monsters.find(m=>m.key===this.monsterKey);if(!entry)throw new Error("Selecione uma criatura.");return openHarvest(await resolveMonster(entry),this.actor);}
     if(action==="manual-monster")return openManualHarvest(this.actor);
     if(action==="review")return openReview(id);
+    if(action==="review-study")return openStudyReview(id);
     if(action==="recover"){await recoverRequest(id);return this.render();}
     if(action==="new-recipe"){await newRecipe();return this.render();}
     if(action==="images")return configureImages();
-    if(action==="rescan"){const {rescanRequests}=await import("./service.mjs");await rescanRequests();return this.render();}
+    if(action==="rescan"){const {rescanRequests}=await import("./service.mjs");await rescanRequests();await rescanStudyRequests();return this.render();}
   }
   async harvestHTML(){
     if(!game.user.isGM)return "";
@@ -84,7 +86,7 @@ export class SelosApp extends ApplicationV2 {
     if(!game.user.isGM)return "";
     const list=[...requests()].sort((a,b)=>b.submittedAt-a.submittedAt);
     const states={pending:"Aguardando aprovação",processing:"Fabricação interrompida ou em andamento",recovery:"Materiais precisam de restauração",completed:"Concluída",rejected:"Recusada"};
-    return `<section class="selos-panel"><h2>Pedidos de fabricação</h2><p>As decisões são processadas pelo mestre ativo${primaryGM()?`: ${e(primaryGM().name)}`:""}.</p>${button("rescan","Atualizar pedidos do chat","fa-arrows-rotate")}<div class="selos-list">${list.map(r=>`<article class="selos-recipe"><h3>${e(getRecipe(r.recipeId)?.name??"Receita removida")}</h3><p>${e(game.actors.get(r.actorUuid.split(".")[1])?.name??r.actorUuid)} — ${e(states[r.status]??r.status)}</p>${r.error?`<p class="selos-error">${e(r.error)}</p>`:""}${r.status==="pending"?button("review","Revisar","fa-hammer",`data-id="${r.id}" ${!isAuthority()?"disabled":""}`):""}${["processing","recovery"].includes(r.status)?button("recover","Restaurar materiais / concluir registro","fa-rotate-left",`data-id="${r.id}" ${!isAuthority()?"disabled":""}`):""}</article>`).join("")||"<p>Nenhum pedido registrado.</p>"}</div></section>`;
+    return `<section class="selos-panel"><h2>Pedidos</h2><p>As decisões são processadas pelo mestre ativo${primaryGM()?`: ${e(primaryGM().name)}`:""}.</p>${button("rescan","Atualizar pedidos do chat","fa-arrows-rotate")}<h2>Pedidos de estudo</h2><div class="selos-list">${[...studyRequests()].sort((a,b)=>b.submittedAt-a.submittedAt).map(row=>`<article class="selos-recipe"><h3>Estudo de ${e(game.actors.get(row.actorUuid.split(".")[1])?.name??"Personagem")}</h3><p>${row.itemIds.length} componente(s) — ${e(({pending:"Aguardando aprovação",completed:"Aprovado",rejected:"Recusado"})[row.status]??row.status)}</p>${button("review-study",row.status==="pending"?"Revisar estudo":"Ver estudo","fa-book-open",`data-id="${row.id}"`)}</article>`).join("")||"<p>Nenhum pedido de estudo registrado.</p>"}</div><h2>Pedidos de fabricação</h2><div class="selos-list">${list.map(r=>`<article class="selos-recipe"><h3>${e(getRecipe(r.recipeId)?.name??"Receita removida")}</h3><p>${e(game.actors.get(r.actorUuid.split(".")[1])?.name??r.actorUuid)} — ${e(states[r.status]??r.status)}</p>${r.error?`<p class="selos-error">${e(r.error)}</p>`:""}${r.status==="pending"?button("review","Revisar","fa-hammer",`data-id="${r.id}" ${!isAuthority()?"disabled":""}`):""}${["processing","recovery"].includes(r.status)?button("recover","Restaurar materiais / concluir registro","fa-rotate-left",`data-id="${r.id}" ${!isAuthority()?"disabled":""}`):""}</article>`).join("")||"<p>Nenhum pedido registrado.</p>"}</div></section>`;
   }
 }
 let app;
@@ -96,7 +98,7 @@ export function openBook(actor,view="book"){
 }
 export function refreshBook(actor){if(app?.rendered)app.render();refreshPlayerPanels(actor);}
 
-export function openStudy(actor){return openPlayerStudy(actor);}
+export function openStudy(actor,options){return openPlayerStudy(actor,options);}
 export function openCraft(actor,recipe){return openForge(actor,recipe);}
 export async function editComponentTraits(item){
   if(!game.user.isGM || item?.getFlag(ID,"kind")!=="component")throw new Error("Somente o mestre pode conferir a origem de um componente.");

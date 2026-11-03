@@ -23,7 +23,7 @@ export function rarityFromCR(value) {
   if (!Number.isFinite(n) || n < 0.25) return null;
   return n < 1 ? "common" : n < 5 ? "uncommon" : n < 11 ? "rare" : n < 17 ? "veryRare" : "legendary";
 }
-export function studyLimit(actor, mode="score") {
+export function studyLimit(actor, mode="modifier") {
   return Math.max(0, Math.floor(Number(actor.system?.abilities?.int?.[mode === "modifier" ? "mod" : "value"]) || 0));
 }
 export function safeImage(value, fallback="icons/svg/mystery-man.svg") {
